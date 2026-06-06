@@ -1,0 +1,12 @@
+feat: Views page, dashboard improvements and timer fixes (v1.2)
+
+- Add flexible Views page with Filter and Display panels (group by, sort, visible columns)
+- Add saved views with CRUD operations and sidebar integration
+- Add resizable and persistent columns, row numbers, start and created date columns
+- Add group headers with task count, total Est and Log time with clock icons
+- Add No Project filter option in ViewFilterPanel
+- Add Timer column header in Views table
+- Add DailyProgressWidget on dashboard showing Est and Logged time for today with progress bar
+- Show project name and task name in TimerWidget while running
+- Fix TimerWidget Stop button to use stopActive so time entries are saved and logged time updates
+- Fix DailyProgressWidget estimate to use same isSameDay and DEFAULT_DUR logic as planner

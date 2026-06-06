@@ -35,7 +35,7 @@ export function QuickCreateTaskDialog({ open, onOpenChange, scheduledStart }: Qu
   const { data: projects = [] } = useProjects()
 
   const [title, setTitle] = useState('')
-  const [projectId, setProjectId] = useState<string>('')
+  const [projectId, setProjectId] = useState<string | null>(null)
   const [estimate, setEstimate] = useState('')
 
   // Default to first project whenever the dialog opens
@@ -47,7 +47,7 @@ export function QuickCreateTaskDialog({ open, onOpenChange, scheduledStart }: Qu
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!title.trim() || !projectId) return
+    if (!title.trim()) return
 
     await createTask.mutateAsync({
       title: title.trim(),
@@ -90,11 +90,12 @@ export function QuickCreateTaskDialog({ open, onOpenChange, scheduledStart }: Qu
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Project</Label>
-              <Select value={projectId} onValueChange={(v) => v && setProjectId(v)}>
+              <Select value={projectId ?? 'none'} onValueChange={(v) => setProjectId(v === 'none' ? null : v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select project" />
+                  <SelectValue placeholder="No project" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">No project</SelectItem>
                   {projects.map((p) => (
                     <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                   ))}
@@ -116,7 +117,7 @@ export function QuickCreateTaskDialog({ open, onOpenChange, scheduledStart }: Qu
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!title.trim() || !projectId || createTask.isPending}>
+            <Button type="submit" disabled={!title.trim() || createTask.isPending}>
               {createTask.isPending ? 'Creating…' : 'Create task'}
             </Button>
           </DialogFooter>

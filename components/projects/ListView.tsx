@@ -46,6 +46,8 @@ interface ListViewProps {
   noteCounts?: Record<string, number>
   /** localStorage key used to persist column widths. */
   persistKey?: string
+  /** Show the project column (useful in cross-project views). */
+  showProject?: boolean
 }
 
 export function ListView({
@@ -53,6 +55,7 @@ export function ListView({
   timeTotals = {},
   noteCounts = {},
   persistKey = 'focusly:list-col-sizing',
+  showProject = false,
 }: ListViewProps) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -171,11 +174,26 @@ export function ListView({
         )
       },
     },
+    ...(showProject ? [{
+      id: 'project',
+      header: 'Project',
+      size: 160,
+      cell: ({ row }: { row: { original: Task } }) => {
+        const p = row.original.project
+        if (!p) return <span className="text-xs text-muted-foreground">—</span>
+        return (
+          <span className="flex items-center gap-1.5 text-sm">
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
+            <span className="truncate">{p.name}</span>
+          </span>
+        )
+      },
+      enableSorting: false,
+    } as ColumnDef<Task>] : []),
     {
       accessorKey: 'priority',
       header: 'Priority',
-      size: 96,
-      cell: ({ row }) => {
+      size: 96,      cell: ({ row }) => {
         const p = row.original.priority
         return (
           <DropdownMenu>

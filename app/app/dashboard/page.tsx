@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import { TimerWidget } from '@/components/dashboard/TimerWidget'
+import { DailyProgressWidget } from '@/components/dashboard/DailyProgressWidget'
 import { TodaysTasksWidget } from '@/components/dashboard/TodaysTasksWidget'
 import { UpcomingWidget } from '@/components/dashboard/UpcomingWidget'
 import { RecentNotesWidget } from '@/components/dashboard/RecentNotesWidget'
@@ -25,6 +26,9 @@ export default function DashboardPage() {
 
       {/* Timer — full width */}
       <TimerWidget />
+
+      {/* Daily Progress — full width */}
+      <DailyProgressWidget />
 
       {/* Main grid: 2 columns */}
       <div className="grid gap-4 lg:grid-cols-2">

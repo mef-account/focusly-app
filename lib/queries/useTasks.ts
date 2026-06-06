@@ -41,6 +41,41 @@ export function useTasksDueToday() {
   })
 }
 
+/** Tasks active today: due today OR scheduled (scheduled_start) today */
+export function useTasksActiveToday() {
+  return useQuery({
+    queryKey: ['tasks', 'active-today'],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0]
+      const todayEnd = `${today}T23:59:59`
+
+      const [dueRes, scheduledRes] = await Promise.all([
+        supabase
+          .from('tasks')
+          .select('id, estimate_minutes')
+          .eq('due_date', today)
+          .not('status', 'in', '("done","cancelled")'),
+        supabase
+          .from('tasks')
+          .select('id, estimate_minutes')
+          .gte('scheduled_start', today)
+          .lte('scheduled_start', todayEnd)
+          .not('status', 'in', '("done","cancelled")'),
+      ])
+
+      if (dueRes.error) throw toError(dueRes.error)
+      if (scheduledRes.error) throw toError(scheduledRes.error)
+
+      // Merge, deduplicate by id
+      const map = new Map<string, { id: string; estimate_minutes: number | null }>()
+      for (const t of [...(dueRes.data ?? []), ...(scheduledRes.data ?? [])]) {
+        map.set(t.id, t)
+      }
+      return Array.from(map.values())
+    },
+  })
+}
+
 export function useTasksDueThisWeek() {
   return useQuery({
     queryKey: ['tasks', 'due-this-week'],
