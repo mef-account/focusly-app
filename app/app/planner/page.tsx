@@ -13,7 +13,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { format, addDays, addMinutes, isSameDay, parseISO, isToday } from 'date-fns'
-import { ChevronLeft, ChevronRight, Plus, CalendarClock, Inbox as InboxIcon } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, CalendarClock, Inbox as InboxIcon, Clock3, Timer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -25,12 +25,15 @@ import {
 import { TaskSheet } from '@/components/tasks/TaskSheet'
 import { StatusIcon } from '@/components/tasks/StatusIcon'
 import { PriorityIcon } from '@/components/tasks/PriorityIcon'
+import { AssigneePicker } from '@/components/tasks/AssigneePicker'
+import { TaskTimerButton } from '@/components/tracker/TaskTimerButton'
 import { QuickCreateTaskDialog } from '@/components/planner/QuickCreateTaskDialog'
 import { useTasks, useUpdateTask } from '@/lib/queries/useTasks'
 import { useProjects } from '@/lib/queries/useProjects'
+import { useTimeTotalsByTask } from '@/lib/queries/useTimeEntries'
 import { usePlannerStore } from '@/store/usePlannerStore'
 import { useTaskPanelStore } from '@/store/useTaskPanelStore'
-import { formatMinutes, cn } from '@/lib/utils'
+import { formatMinutes, formatDuration, cn } from '@/lib/utils'
 import type { Task, TaskPriority } from '@/types'
 
 // ─── Time grid config ─────────────────────────────────────────────────────────
@@ -121,11 +124,15 @@ function InboxCard({
   selected,
   onSelect,
   onOpen,
+  loggedSeconds,
+  onAssigneeChange,
 }: {
   task: Task
   selected: boolean
   onSelect: () => void
   onOpen: () => void
+  loggedSeconds?: number
+  onAssigneeChange: (id: string | null) => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id })
   return (
@@ -146,16 +153,30 @@ function InboxCard({
         <span className="flex-1 truncate text-[13px] font-medium">{task.title}</span>
         {task.priority !== 'none' && <PriorityIcon priority={task.priority} />}
       </div>
-      <div className="mt-1 flex items-center gap-2 pl-5">
-        {task.project && (
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: task.project.color }} />
-            {task.project.name}
-          </span>
-        )}
-        {task.estimate_minutes && (
-          <span className="text-[10px] text-muted-foreground">{formatMinutes(task.estimate_minutes)}</span>
-        )}
+      <div className="mt-1.5 flex items-center justify-between pl-5">
+        <div className="flex items-center gap-2">
+          {task.project && (
+            <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: task.project.color }} />
+              {task.project.name}
+            </span>
+          )}
+          {!!loggedSeconds && (
+            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title="Total logged">
+              <Clock3 className="h-2.5 w-2.5" />
+              {formatDuration(loggedSeconds)}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <TaskTimerButton task={task} />
+          <AssigneePicker
+            value={task.assignee_id}
+            assignee={task.assignee}
+            stopPropagation
+            onChange={onAssigneeChange}
+          />
+        </div>
       </div>
     </div>
   )
@@ -178,7 +199,17 @@ function DroppableInbox({ children }: { children: React.ReactNode }) {
 }
 
 // ─── Draggable week task pill (center) ────────────────────────────────────────
-function WeekTaskPill({ task, onOpen }: { task: Task; onOpen: () => void }) {
+function WeekTaskPill({
+  task,
+  onOpen,
+  loggedSeconds,
+  onAssigneeChange,
+}: {
+  task: Task
+  onOpen: () => void
+  loggedSeconds?: number
+  onAssigneeChange: (id: string | null) => void
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `week::${task.id}` })
   const dur = task.estimate_minutes ?? DEFAULT_DUR
   const startIso = parseISO(task.scheduled_start!)
@@ -199,11 +230,29 @@ function WeekTaskPill({ task, onOpen }: { task: Task; onOpen: () => void }) {
         <span className="text-[10px] tabular-nums text-muted-foreground">
           {format(startIso, 'HH:mm')}–{format(addMinutes(startIso, dur), 'HH:mm')}
         </span>
-        <span className="shrink-0 text-[10px] text-muted-foreground">
-          {formatMinutes(dur)}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="flex items-center gap-0.5 text-[10px] text-foreground" title="Estimate">
+            <Timer className="h-2.5 w-2.5" />
+            <span className="opacity-50">Est</span> {formatMinutes(dur)}
+          </span>
+          {!!loggedSeconds && (
+            <span className="flex items-center gap-0.5 text-[10px] text-foreground" title="Total logged">
+              <Clock3 className="h-2.5 w-2.5" />
+              <span className="opacity-50">Log</span> {formatDuration(loggedSeconds)}
+            </span>
+          )}
+        </div>
       </div>
       <span className="truncate text-[11px] font-medium leading-tight">{task.title}</span>
+      <div className="flex items-center justify-end gap-1 pt-0.5">
+        <TaskTimerButton task={task} />
+        <AssigneePicker
+          value={task.assignee_id}
+          assignee={task.assignee}
+          stopPropagation
+          onChange={onAssigneeChange}
+        />
+      </div>
     </div>
   )
 }
@@ -215,12 +264,16 @@ function WeekDayColumn({
   selected,
   onSelectDay,
   onOpenTask,
+  timeTotals,
+  onAssigneeChange,
 }: {
   day: Date
   tasks: Task[]
   selected: boolean
   onSelectDay: () => void
   onOpenTask: (id: string) => void
+  timeTotals: Record<string, number>
+  onAssigneeChange: (taskId: string, assigneeId: string | null) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `day-${format(day, 'yyyy-MM-dd')}`,
@@ -228,6 +281,7 @@ function WeekDayColumn({
   })
 
   const totalMinutes = tasks.reduce((sum, t) => sum + (t.estimate_minutes ?? DEFAULT_DUR), 0)
+  const totalLoggedSeconds = tasks.reduce((sum, t) => sum + (timeTotals[t.id] ?? 0), 0)
 
   return (
     <div className="flex min-w-0 flex-1 flex-col border-r last:border-r-0">
@@ -250,9 +304,18 @@ function WeekDayColumn({
           {format(day, 'd')}
         </span>
         {totalMinutes > 0 && (
-          <span className="text-[10px] tabular-nums text-muted-foreground">
-            {formatMinutes(totalMinutes)}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+              <Timer className="h-2.5 w-2.5" />
+              <span className="opacity-60">Est</span> {formatMinutes(totalMinutes)}
+            </span>
+            {totalLoggedSeconds > 0 && (
+              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                <Clock3 className="h-2.5 w-2.5" />
+                <span className="opacity-60">Log</span> {formatDuration(totalLoggedSeconds)}
+              </span>
+            )}
+          </div>
         )}
       </button>
 
@@ -263,7 +326,13 @@ function WeekDayColumn({
         {tasks
           .sort((a, b) => minutesOfDay(a.scheduled_start!) - minutesOfDay(b.scheduled_start!))
           .map((t) => (
-            <WeekTaskPill key={t.id} task={t} onOpen={() => onOpenTask(t.id)} />
+            <WeekTaskPill
+              key={t.id}
+              task={t}
+              onOpen={() => onOpenTask(t.id)}
+              loggedSeconds={timeTotals[t.id]}
+              onAssigneeChange={(id) => onAssigneeChange(t.id, id)}
+            />
           ))}
       </div>
     </div>
@@ -477,6 +546,24 @@ export default function PlannerPage() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [slotMinutes, setSlotMinutes] = useState(30)
+  const [visibleDayIndices, setVisibleDayIndices] = useState<Set<number>>(() => {
+    const jsDay = new Date().getDay()
+    const todayIdx = jsDay === 0 ? 6 : jsDay - 1 // 0=Mon … 6=Sun
+    const indices = new Set<number>()
+    if (todayIdx > 0) indices.add(todayIdx - 1)
+    indices.add(todayIdx)
+    if (todayIdx < 6) indices.add(todayIdx + 1)
+    return indices
+  })
+
+  const toggleDay = (i: number) => {
+    setVisibleDayIndices((prev) => {
+      const next = new Set(prev)
+      if (next.has(i) && next.size === 1) return prev // keep at least one day
+      next.has(i) ? next.delete(i) : next.add(i)
+      return next
+    })
+  }
   const blockClickSuppressRef = useRef(false)
   const [quickCreate, setQuickCreate] = useState<{ open: boolean; iso: string | null }>({
     open: false,
@@ -512,25 +599,33 @@ export default function PlannerPage() {
     [activeWeekStart]
   )
 
-  // Inbox = unscheduled, active tasks (filtered)
+  const visibleWeekDays = useMemo(
+    () => weekDays.filter((_, i) => visibleDayIndices.has(i)),
+    [weekDays, visibleDayIndices]
+  )
+
+  // Inbox = unscheduled, in-progress tasks (filtered by project)
   const inboxTasks = useMemo(() => {
     return tasks.filter((t) => {
       if (t.scheduled_start) return false
-      if (t.status === 'done' || t.status === 'cancelled') return false
+      if (t.status !== 'in_progress') return false
       if (inboxFilter.projectId && t.project_id !== inboxFilter.projectId) return false
-      if (inboxFilter.priority && t.priority !== inboxFilter.priority) return false
       return true
     })
   }, [tasks, inboxFilter])
 
-  const inboxByStatus = useMemo(() => {
-    const order = ['in_progress', 'todo', 'backlog', 'in_review'] as const
+  const inboxByPriority = useMemo(() => {
+    const order = ['urgent', 'high', 'medium', 'low', 'none'] as const
     return order
-      .map((status) => ({ status, items: inboxTasks.filter((t) => t.status === status) }))
+      .map((priority) => ({ priority, items: inboxTasks.filter((t) => t.priority === priority) }))
       .filter((g) => g.items.length > 0)
   }, [inboxTasks])
 
   const scheduledTasks = useMemo(() => tasks.filter((t) => t.scheduled_start && t.status !== 'cancelled'), [tasks])
+
+  const { data: timeTotals = {} } = useTimeTotalsByTask(
+    [...inboxTasks, ...scheduledTasks].map((t) => t.id)
+  )
 
   const tasksForDay = (day: Date) =>
     scheduledTasks.filter((t) => isSameDay(parseISO(t.scheduled_start!), day))
@@ -657,38 +752,22 @@ export default function PlannerPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select
-              value={inboxFilter.priority ?? 'all'}
-              onValueChange={(v) => setInboxFilter({ priority: v === 'all' ? null : (v as TaskPriority) })}
-            >
-              <SelectTrigger className="h-7 text-xs">
-                <SelectValue placeholder="Any priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Any priority</SelectItem>
-                <SelectItem value="urgent">Urgent</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="none">No priority</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           {/* Inbox list — also a drop target to unschedule a task */}
           <DroppableInbox>
           <div className="flex-1 space-y-3 overflow-y-auto p-2">
-            {inboxByStatus.length === 0 ? (
+            {inboxByPriority.length === 0 ? (
               <p className="px-1 py-8 text-center text-xs text-muted-foreground">
                 Nothing to schedule. Drag tasks here by clearing their date.
               </p>
             ) : (
-              inboxByStatus.map((group) => (
-                <div key={group.status} className="space-y-1">
+              inboxByPriority.map((group) => (
+                <div key={group.priority} className="space-y-1">
                   <div className="flex items-center gap-1.5 px-1">
-                    <StatusIcon status={group.status} />
+                    <PriorityIcon priority={group.priority} />
                     <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {group.status.replace('_', ' ')}
+                      {group.priority === 'none' ? 'No priority' : group.priority}
                     </span>
                   </div>
                   {group.items.map((t) => (
@@ -698,6 +777,8 @@ export default function PlannerPage() {
                       selected={selectedTaskId === t.id}
                       onSelect={() => setSelectedTaskId(t.id)}
                       onOpen={() => openTaskSheet(t.id)}
+                      loggedSeconds={timeTotals[t.id]}
+                      onAssigneeChange={(id) => updateTask.mutate({ id: t.id, assignee_id: id })}
                     />
                   ))}
                 </div>
@@ -714,25 +795,44 @@ export default function PlannerPage() {
 
         {/* ─── Center: Weekly Calendar ─── */}
         <div className="flex flex-1 flex-col overflow-hidden">
-          <div className="flex items-center gap-2 border-b px-3 py-2">
-            <CalendarClock className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold">
-              {format(weekDays[0], 'MMM d')} – {format(weekDays[6], 'MMM d, yyyy')}
-            </span>
-            <div className="ml-auto flex items-center gap-1">
-              <Button variant="outline" size="sm" className="h-7" onClick={goToToday}>
-                Today
-              </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={prevWeek}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={nextWeek}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+          <div className="flex flex-col border-b">
+            <div className="flex items-center gap-2 px-3 py-2">
+              <CalendarClock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold">
+                {format(weekDays[0], 'MMM d')} – {format(weekDays[6], 'MMM d, yyyy')}
+              </span>
+              <div className="ml-auto flex items-center gap-1">
+                <Button variant="outline" size="sm" className="h-7" onClick={goToToday}>
+                  Today
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={prevWeek}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={nextWeek}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            {/* Day-of-week visibility toggles */}
+            <div className="flex items-center gap-1 px-3 pb-2">
+              {weekDays.map((day, i) => (
+                <button
+                  key={i}
+                  onClick={() => toggleDay(i)}
+                  className={cn(
+                    'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
+                    visibleDayIndices.has(i)
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  {format(day, 'EEE')}
+                </button>
+              ))}
             </div>
           </div>
           <div className="flex flex-1 overflow-y-auto">
-            {weekDays.map((day) => (
+            {visibleWeekDays.map((day) => (
               <WeekDayColumn
                 key={day.toISOString()}
                 day={day}
@@ -740,6 +840,8 @@ export default function PlannerPage() {
                 selected={isSameDay(day, selectedDay)}
                 onSelectDay={() => setSelectedDay(day)}
                 onOpenTask={openTaskSheet}
+                timeTotals={timeTotals}
+                onAssigneeChange={(taskId, id) => updateTask.mutate({ id: taskId, assignee_id: id })}
               />
             ))}
           </div>
