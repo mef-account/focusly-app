@@ -149,7 +149,11 @@ function InboxCard({
       )}
     >
       <div className="flex items-center gap-1.5">
-        <StatusIcon status={task.status} />
+        {task.project ? (
+          <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: task.project.color }} />
+        ) : (
+          <StatusIcon status={task.status} />
+        )}
         <span className="flex-1 truncate text-[13px] font-medium">{task.title}</span>
         {task.priority !== 'none' && <PriorityIcon priority={task.priority} />}
       </div>

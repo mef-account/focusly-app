@@ -28,8 +28,7 @@ export function NotesList({ activeId, onSelect }: NotesListProps) {
 
   async function handleCreate() {
     try {
-      const note = await createNote.mutateAsync({})
-      onSelect(note.id)
+      await createNote.mutateAsync({})
     } catch (err) {
       console.error('Failed to create note:', err)
       alert(`Could not create note: ${err instanceof Error ? err.message : String(err)}`)

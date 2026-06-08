@@ -64,7 +64,7 @@ const DEFAULT_FILTERS: ActiveFilters = {
 
 // ─── Grouping helpers ─────────────────────────────────────────────────────────
 
-const STATUS_ORDER: TaskStatus[] = ['in_progress', 'in_review', 'todo', 'backlog', 'done', 'cancelled']
+const STATUS_ORDER: TaskStatus[] = ['in_progress', 'todo', 'backlog', 'done', 'cancelled']
 const PRIORITY_ORDER: TaskPriority[] = ['urgent', 'high', 'medium', 'low', 'none']
 
 function getGroupKey(task: Task, groupBy: ViewGroupBy): string {
@@ -725,7 +725,7 @@ interface TaskRowProps {
   onUpdateTask: (updates: Partial<Task>) => void
 }
 
-const STATUSES: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'cancelled']
+const STATUSES: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'done', 'cancelled']
 const PRIORITIES: TaskPriority[] = ['urgent', 'high', 'medium', 'low', 'none']
 
 function isOverdue(dateStr: string | null): boolean {

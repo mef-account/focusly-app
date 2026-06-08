@@ -14,7 +14,7 @@ import { PriorityIcon } from '@/components/tasks/PriorityIcon'
 import { STATUS_LABELS, PRIORITY_LABELS, cn } from '@/lib/utils'
 import type { TaskStatus, TaskPriority, Project, Profile } from '@/types'
 
-const STATUSES: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'cancelled']
+const STATUSES: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'done', 'cancelled']
 const PRIORITIES: TaskPriority[] = ['urgent', 'high', 'medium', 'low', 'none']
 
 export interface ActiveFilters {

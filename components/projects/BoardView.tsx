@@ -28,7 +28,6 @@ const COLUMNS: { id: TaskStatus; label: string }[] = [
   { id: 'backlog', label: 'Backlog' },
   { id: 'todo', label: 'Todo' },
   { id: 'in_progress', label: 'In Progress' },
-  { id: 'in_review', label: 'In Review' },
   { id: 'done', label: 'Done' },
 ]
 

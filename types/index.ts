@@ -4,15 +4,12 @@ export type TaskStatus =
   | 'backlog'
   | 'todo'
   | 'in_progress'
-  | 'in_review'
   | 'done'
   | 'cancelled'
 
 export type TaskPriority = 'urgent' | 'high' | 'medium' | 'low' | 'none'
 
 export type Tag = 'work' | 'personal'
-
-export type InitiativeStatus = 'active' | 'on_hold' | 'completed' | 'cancelled'
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
@@ -34,15 +31,17 @@ export interface Workspace {
   created_at: string
 }
 
-// ─── Initiative ───────────────────────────────────────────────────────────────
+// ─── Portfolio ────────────────────────────────────────────────────────────────
 
-export interface Initiative {
+export type PortfolioStatus = 'active' | 'on_hold' | 'completed' | 'cancelled'
+
+export interface Portfolio {
   id: string
   workspace_id: string
   name: string
   description: string | null
   color: string
-  status: InitiativeStatus
+  status: PortfolioStatus
   owner_id: string | null
   start_date: string | null
   target_date: string | null
@@ -58,7 +57,7 @@ export interface Initiative {
 export interface Project {
   id: string
   workspace_id: string
-  initiative_id: string | null
+  portfolio_id: string | null
   name: string
   description: string | null
   color: string

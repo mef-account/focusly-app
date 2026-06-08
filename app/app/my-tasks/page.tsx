@@ -22,7 +22,7 @@ import {
 } from '@/lib/utils'
 import type { Task, TaskStatus } from '@/types'
 
-const GROUP_ORDER: TaskStatus[] = ['in_progress', 'todo', 'in_review', 'backlog']
+const GROUP_ORDER: TaskStatus[] = ['in_progress', 'todo', 'backlog']
 
 function TaskRow({ task, loggedSeconds, noteCount }: { task: Task; loggedSeconds?: number; noteCount?: number }) {
   const { open } = useTaskPanelStore()

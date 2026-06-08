@@ -27,7 +27,7 @@ import {
 } from '@/lib/utils'
 import type { TaskStatus, TaskPriority } from '@/types'
 
-const STATUSES: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'in_review', 'done']
+const STATUSES: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'done']
 const PRIORITIES: TaskPriority[] = ['urgent', 'high', 'medium', 'low', 'none']
 
 export function QuickCreateTaskDialog() {

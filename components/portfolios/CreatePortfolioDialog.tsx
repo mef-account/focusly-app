@@ -1,8 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -13,12 +11,16 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { useCreateProject } from '@/lib/queries/useProjects'
-import { useWorkspace } from '@/lib/queries/useWorkspace'
-import { usePortfolios } from '@/lib/queries/usePortfolios'
+import { Button } from '@/components/ui/button'
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select'
+import { useCreatePortfolio } from '@/lib/queries/usePortfolios'
+import { useWorkspaces } from '@/lib/queries/useWorkspace'
 
 const COLORS = [
   '#534AB7', '#7C3AED', '#2563EB', '#0891B2',
@@ -26,37 +28,38 @@ const COLORS = [
   '#64748B', '#1D4ED8', '#7E22CE', '#BE123C',
 ]
 
-interface CreateProjectDialogProps {
+interface CreatePortfolioDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogProps) {
-  const { data: workspace } = useWorkspace()
-  const createProject = useCreateProject()
-  const { data: portfolios = [] } = usePortfolios()
+export function CreatePortfolioDialog({ open, onOpenChange }: CreatePortfolioDialogProps) {
+  const { data: workspaces = [] } = useWorkspaces()
+  const createPortfolio = useCreatePortfolio()
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [color, setColor] = useState(COLORS[0])
-  const [portfolioId, setPortfolioId] = useState<string>('none')
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState('')
+
+  // Default to first workspace once loaded
+  const effectiveWorkspaceId = selectedWorkspaceId || workspaces[0]?.id || ''
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!workspace || !name.trim()) return
+    if (!effectiveWorkspaceId || !name.trim()) return
 
-    await createProject.mutateAsync({
+    await createPortfolio.mutateAsync({
       name: name.trim(),
       description: description.trim() || null,
       color,
-      workspace_id: workspace.id,
-      portfolio_id: portfolioId === 'none' ? null : portfolioId,
+      workspace_id: effectiveWorkspaceId,
     })
 
     setName('')
     setDescription('')
     setColor(COLORS[0])
-    setPortfolioId('none')
+    setSelectedWorkspaceId('')
     onOpenChange(false)
   }
 
@@ -64,14 +67,14 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>New project</DialogTitle>
+          <DialogTitle>New portfolio</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="proj-name">Name</Label>
+            <Label htmlFor="portfolio-name">Name</Label>
             <Input
-              id="proj-name"
-              placeholder="Project name"
+              id="portfolio-name"
+              placeholder="Portfolio name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -79,31 +82,26 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
             />
           </div>
 
-          {portfolios.length > 0 && (
-            <div className="space-y-1.5">
-              <Label>Portfolio</Label>
-              <Select value={portfolioId} onValueChange={setPortfolioId}>
-                <SelectTrigger>
-                  <SelectValue>
-                    {portfolioId === 'none'
-                      ? 'No portfolio'
-                      : portfolios.find((p) => p.id === portfolioId)?.name ?? 'No portfolio'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No portfolio</SelectItem>
-                  {portfolios.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      <span className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full inline-block" style={{ backgroundColor: p.color }} />
-                        {p.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div className="space-y-1.5">
+            <Label>Workspace</Label>
+            <Select
+              value={effectiveWorkspaceId}
+              onValueChange={setSelectedWorkspaceId}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a workspace">
+                  {workspaces.find((ws) => ws.id === effectiveWorkspaceId)?.name ?? 'Select a workspace'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {workspaces.map((ws) => (
+                  <SelectItem key={ws.id} value={ws.id}>
+                    {ws.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="space-y-1.5">
             <Label>Color</Label>
@@ -125,9 +123,9 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="proj-desc">Description</Label>
+            <Label htmlFor="portfolio-desc">Description</Label>
             <Textarea
-              id="proj-desc"
+              id="portfolio-desc"
               placeholder="Optional description"
               rows={3}
               value={description}
@@ -139,8 +137,8 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!name.trim() || createProject.isPending}>
-              {createProject.isPending ? 'Creating…' : 'Create project'}
+            <Button type="submit" disabled={!name.trim() || !effectiveWorkspaceId || createPortfolio.isPending}>
+              {createPortfolio.isPending ? 'Creating…' : 'Create portfolio'}
             </Button>
           </DialogFooter>
         </form>

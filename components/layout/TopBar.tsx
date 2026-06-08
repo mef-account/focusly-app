@@ -7,8 +7,7 @@ import { ThemeToggle } from '@/components/layout/ThemeToggle'
 
 const ROUTE_TITLES: Record<string, string> = {
   '/app/dashboard': 'Dashboard',
-  '/app/initiatives': 'Initiatives',
-  '/app/projects': 'Projects',
+  '/app/projects': 'Structure',
   '/app/my-tasks': 'My Tasks',
   '/app/planner': 'Planner',
   '/app/notes': 'Notes',

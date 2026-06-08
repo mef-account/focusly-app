@@ -5,7 +5,6 @@ const STATUS_COLOR: Record<TaskStatus, string> = {
   backlog: 'text-gray-400',
   todo: 'text-gray-400',
   in_progress: 'text-amber-500',
-  in_review: 'text-purple-500',
   done: 'text-green-500',
   cancelled: 'text-gray-400',
 }
@@ -35,13 +34,6 @@ export function StatusIcon({ status, className }: StatusIconProps) {
           <>
             <circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" strokeWidth="2" />
             <path d="M7 7 L7 3 A4 4 0 0 1 7 11 Z" fill="currentColor" />
-          </>
-        )}
-
-        {status === 'in_review' && (
-          <>
-            <circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" strokeWidth="2" />
-            <path d="M7 7 L7 3 A4 4 0 1 1 3 7 Z" fill="currentColor" />
           </>
         )}
 

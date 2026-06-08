@@ -8,7 +8,7 @@ import { useNotePanelStore } from '@/store/useNotePanelStore'
 import { cn } from '@/lib/utils'
 
 export function NotePanel() {
-  const { activeNoteId, fullscreen, close, setFullscreen } = useNotePanelStore()
+  const { activeNoteId, fullscreen, mode, close, setFullscreen } = useNotePanelStore()
 
   return (
     <Sheet open={!!activeNoteId} onOpenChange={(o) => !o && close()}>
@@ -25,8 +25,9 @@ export function NotePanel() {
 
         {activeNoteId && (
           <NoteEditor
+            key={activeNoteId}
             noteId={activeNoteId}
-            defaultMode={fullscreen ? 'split' : 'preview'}
+            defaultMode={fullscreen ? 'split' : mode}
             onDeleted={close}
             actions={
               <>

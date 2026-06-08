@@ -37,7 +37,7 @@ import {
 } from '@/lib/utils'
 import type { Task, TaskStatus, TaskPriority } from '@/types'
 
-const STATUSES: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'cancelled']
+const STATUSES: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'done', 'cancelled']
 const PRIORITIES: TaskPriority[] = ['urgent', 'high', 'medium', 'low', 'none']
 
 interface ListViewProps {

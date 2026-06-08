@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
-  Layers,
   FolderKanban,
   CheckSquare,
   CalendarDays,
@@ -27,8 +26,7 @@ import {
 
 const PAGES = [
   { label: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
-  { label: 'Initiatives', href: '/app/initiatives', icon: Layers },
-  { label: 'Projects', href: '/app/projects', icon: FolderKanban },
+  { label: 'Structure', href: '/app/projects', icon: FolderKanban },
   { label: 'My Tasks', href: '/app/my-tasks', icon: CheckSquare },
   { label: 'Planner', href: '/app/planner', icon: CalendarDays },
   { label: 'Notes', href: '/app/notes', icon: FileText },

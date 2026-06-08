@@ -1,24 +1,19 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { useState, useEffect } from 'react'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { useCreateProject } from '@/lib/queries/useProjects'
-import { useWorkspace } from '@/lib/queries/useWorkspace'
+import { Button } from '@/components/ui/button'
+import { useUpdateProject } from '@/lib/queries/useProjects'
 import { usePortfolios } from '@/lib/queries/usePortfolios'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import type { Project } from '@/types'
 
 const COLORS = [
   '#534AB7', '#7C3AED', '#2563EB', '#0891B2',
@@ -26,37 +21,40 @@ const COLORS = [
   '#64748B', '#1D4ED8', '#7E22CE', '#BE123C',
 ]
 
-interface CreateProjectDialogProps {
+interface EditProjectDialogProps {
+  project: Project
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogProps) {
-  const { data: workspace } = useWorkspace()
-  const createProject = useCreateProject()
+export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDialogProps) {
+  const updateProject = useUpdateProject()
   const { data: portfolios = [] } = usePortfolios()
 
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [color, setColor] = useState(COLORS[0])
-  const [portfolioId, setPortfolioId] = useState<string>('none')
+  const [name, setName] = useState(project.name)
+  const [description, setDescription] = useState(project.description ?? '')
+  const [color, setColor] = useState(project.color)
+  const [portfolioId, setPortfolioId] = useState<string>(project.portfolio_id ?? 'none')
+
+  useEffect(() => {
+    if (open) {
+      setName(project.name)
+      setDescription(project.description ?? '')
+      setColor(project.color)
+      setPortfolioId(project.portfolio_id ?? 'none')
+    }
+  }, [open, project])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!workspace || !name.trim()) return
-
-    await createProject.mutateAsync({
+    if (!name.trim()) return
+    await updateProject.mutateAsync({
+      id: project.id,
       name: name.trim(),
       description: description.trim() || null,
       color,
-      workspace_id: workspace.id,
       portfolio_id: portfolioId === 'none' ? null : portfolioId,
     })
-
-    setName('')
-    setDescription('')
-    setColor(COLORS[0])
-    setPortfolioId('none')
     onOpenChange(false)
   }
 
@@ -64,14 +62,13 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>New project</DialogTitle>
+          <DialogTitle>Edit project</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="proj-name">Name</Label>
+            <Label htmlFor="edit-proj-name">Name</Label>
             <Input
-              id="proj-name"
-              placeholder="Project name"
+              id="edit-proj-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -125,10 +122,9 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="proj-desc">Description</Label>
+            <Label htmlFor="edit-proj-desc">Description</Label>
             <Textarea
-              id="proj-desc"
-              placeholder="Optional description"
+              id="edit-proj-desc"
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -136,11 +132,9 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!name.trim() || createProject.isPending}>
-              {createProject.isPending ? 'Creating…' : 'Create project'}
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={!name.trim() || updateProject.isPending}>
+              {updateProject.isPending ? 'Saving…' : 'Save changes'}
             </Button>
           </DialogFooter>
         </form>

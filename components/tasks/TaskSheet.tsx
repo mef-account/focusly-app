@@ -15,10 +15,10 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { CalendarIcon, Clock, ChevronDown, X, Plus, Check, FileText, Maximize2 } from 'lucide-react'
+import { CalendarIcon, Clock, ChevronDown, X, Plus, Check, FileText, Maximize2, Trash2, MoreHorizontal } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useTaskPanelStore } from '@/store/useTaskPanelStore'
-import { useUpdateTask } from '@/lib/queries/useTasks'
+import { useUpdateTask, useDeleteTask } from '@/lib/queries/useTasks'
 import { useTimeTotalsByTask } from '@/lib/queries/useTimeEntries'
 import { useNotesByTask, useCreateNote } from '@/lib/queries/useNotes'
 import { useNotePanelStore } from '@/store/useNotePanelStore'
@@ -38,7 +38,7 @@ import {
 } from '@/lib/utils'
 import type { Task, TaskStatus, TaskPriority, Comment } from '@/types'
 
-const STATUSES: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'cancelled']
+const STATUSES: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'done', 'cancelled']
 const PRIORITIES: TaskPriority[] = ['urgent', 'high', 'medium', 'low', 'none']
 
 const supabase = createClient()
@@ -153,6 +153,7 @@ function SubtaskRow({
 export function TaskSheet() {
   const { activeTaskId, close } = useTaskPanelStore()
   const updateTask = useUpdateTask()
+  const deleteTask = useDeleteTask()
 
   const [task, setTask] = useState<Task | null>(null)
   const { data: timeTotals = {} } = useTimeTotalsByTask(task ? [task.id] : [])
@@ -170,7 +171,7 @@ export function TaskSheet() {
       content: '',
       tag: 'work',
     })
-    openNote(note.id)
+    openNote(note.id, { mode: 'edit' })
   }
   const [subtasks, setSubtasks] = useState<Task[]>([])
   const [comments, setComments] = useState<Comment[]>([])
@@ -178,6 +179,7 @@ export function TaskSheet() {
   const [newComment, setNewComment] = useState('')
   const [estimateInput, setEstimateInput] = useState('')
   const [titleEdit, setTitleEdit] = useState('')
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
   useEffect(() => {
     if (!activeTaskId) { setTask(null); return }
@@ -251,14 +253,76 @@ export function TaskSheet() {
   return (
     <Sheet open={!!activeTaskId} onOpenChange={(o) => !o && close()}>
       <SheetContent className="flex w-full flex-col gap-0 overflow-y-auto p-0 sm:max-w-xl">
-        <SheetHeader className="border-b p-4">
-          <input
-            className="w-full bg-transparent text-lg font-semibold outline-none placeholder:text-muted-foreground"
-            value={titleEdit}
-            onChange={(e) => setTitleEdit(e.target.value)}
-            onBlur={() => { if (titleEdit !== task.title) patch({ title: titleEdit }) }}
-          />
+        <SheetHeader className="border-b p-4 pr-12">
+          <div className="flex min-w-0 max-w-full items-center gap-0.5">
+            <div className="inline-grid min-w-0 max-w-[calc(100%-2.25rem)]">
+              <span
+                aria-hidden
+                className="invisible col-start-1 row-start-1 whitespace-pre text-lg font-semibold"
+              >
+                {titleEdit || ' '}
+              </span>
+              <input
+                className="col-start-1 row-start-1 min-w-0 w-full bg-transparent text-lg font-semibold outline-none placeholder:text-muted-foreground"
+                value={titleEdit}
+                onChange={(e) => setTitleEdit(e.target.value)}
+                onBlur={() => { if (titleEdit !== task.title) patch({ title: titleEdit }) }}
+              />
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  title="Task options"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => setConfirmDeleteOpen(true)}
+                >
+                  <Trash2 className="mr-2 h-3.5 w-3.5" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </SheetHeader>
+
+        {/* Delete confirmation dialog */}
+        {confirmDeleteOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="mx-4 w-full max-w-sm rounded-xl border bg-card p-6 shadow-xl">
+              <div className="mb-1 flex items-center gap-2 text-destructive">
+                <Trash2 className="h-4 w-4" />
+                <p className="font-semibold">Delete task</p>
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Are you sure you want to delete <span className="font-medium text-foreground">{task.title}</span>? This action cannot be undone.
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  onClick={() => setConfirmDeleteOpen(false)}
+                  className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    await deleteTask.mutateAsync(task.id)
+                    setConfirmDeleteOpen(false)
+                    close()
+                  }}
+                  className="rounded-md bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                >
+                  {deleteTask.isPending ? 'Deleting…' : 'Delete task'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-0 overflow-y-auto">
           {/* Meta row */}
@@ -363,7 +427,7 @@ export function TaskSheet() {
                     <button
                       title="Open full screen"
                       className="text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
-                      onClick={(e) => { e.stopPropagation(); openNote(note.id, true) }}
+                      onClick={(e) => { e.stopPropagation(); openNote(note.id, { fullscreen: true }) }}
                     >
                       <Maximize2 className="h-3.5 w-3.5" />
                     </button>
