@@ -61,6 +61,22 @@ export function useNoteCountsByTask(taskIds: string[]) {
   })
 }
 
+export function useNotesByProject(projectId?: string) {
+  return useQuery({
+    queryKey: ['notes', 'by-project', projectId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('project_id', projectId!)
+        .order('updated_at', { ascending: false })
+      if (error) throw toError(error)
+      return data as Note[]
+    },
+    enabled: !!projectId,
+  })
+}
+
 export function useNote(id: string) {
   return useQuery({
     queryKey: ['notes', id],

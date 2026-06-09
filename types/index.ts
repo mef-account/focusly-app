@@ -148,6 +148,7 @@ export interface Note {
   id: string
   user_id: string
   task_id: string | null
+  project_id: string | null
   title: string
   content: string
   tag: Tag
