@@ -6,10 +6,7 @@ import {
   Plus, FolderKanban, Building2, LayoutGrid,
   MoreHorizontal, Pencil, Trash2, ChevronRight,
 } from 'lucide-react'
-import {
-  addDays, subDays, startOfMonth, endOfMonth,
-  eachMonthOfInterval, differenceInDays, parseISO, format,
-} from 'date-fns'
+import { addDays, subDays, startOfMonth, endOfMonth, parseISO } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -28,6 +25,7 @@ import { DeletePortfolioDialog } from '@/components/portfolios/DeletePortfolioDi
 import { CreateWorkspaceDialog } from '@/components/workspaces/CreateWorkspaceDialog'
 import { EditWorkspaceDialog } from '@/components/workspaces/EditWorkspaceDialog'
 import { DeleteWorkspaceDialog } from '@/components/workspaces/DeleteWorkspaceDialog'
+import { StructureGantt, GANTT_TOOLBAR_H } from '@/components/projects/StructureGantt'
 import { useProjects } from '@/lib/queries/useProjects'
 import { useWorkspaces } from '@/lib/queries/useWorkspace'
 import { usePortfolios } from '@/lib/queries/usePortfolios'
@@ -35,7 +33,6 @@ import { cn } from '@/lib/utils'
 import type { Project, Portfolio, Workspace } from '@/types'
 
 const ROW_H = 'h-9'
-const MONTH_W = 120
 
 type Row =
   | { kind: 'portfolio'; portfolio: Portfolio; projectCount: number }
@@ -63,25 +60,6 @@ function buildGanttWindow(projects: Project[]) {
     start: subDays(parseISO(sorted[0]), 14),
     end: addDays(parseISO(sorted[sorted.length - 1]), 14),
   }
-}
-
-function getBarStyle(
-  project: Project,
-  windowStart: Date,
-  windowEnd: Date,
-) {
-  if (!project.min_due_date || !project.max_due_date) return null
-
-  const totalDays = Math.max(differenceInDays(windowEnd, windowStart), 1)
-  const start = parseISO(project.min_due_date)
-  const end = parseISO(project.max_due_date)
-  const offsetDays = differenceInDays(start, windowStart)
-  const spanDays = Math.max(differenceInDays(end, start), 1)
-
-  const left = (offsetDays / totalDays) * 100
-  const width = Math.max((spanDays / totalDays) * 100, 1.5)
-
-  return { left: `${left}%`, width: `${width}%` }
 }
 
 // ─── Project row (left panel) ─────────────────────────────────────────────────
@@ -124,34 +102,6 @@ function ProjectNameRow({ project }: { project: Project }) {
       <EditProjectDialog project={project} open={editOpen} onOpenChange={setEditOpen} />
       <DeleteProjectDialog project={project} open={deleteOpen} onOpenChange={setDeleteOpen} />
     </>
-  )
-}
-
-// ─── Gantt bar (right panel) ──────────────────────────────────────────────────
-
-function GanttBarRow({
-  project,
-  windowStart,
-  windowEnd,
-}: {
-  project: Project
-  windowStart: Date
-  windowEnd: Date
-}) {
-  const bar = getBarStyle(project, windowStart, windowEnd)
-
-  return (
-    <div className={cn(ROW_H, 'relative flex items-center border-b border-border/40')}>
-      {bar ? (
-        <div
-          className="absolute top-1/2 h-5 -translate-y-1/2 rounded-sm opacity-80"
-          style={{ ...bar, backgroundColor: project.color }}
-          title={`${project.min_due_date} → ${project.max_due_date}`}
-        />
-      ) : (
-        <span className="pl-2 text-xs text-muted-foreground">—</span>
-      )}
-    </div>
   )
 }
 
@@ -315,15 +265,9 @@ export default function ProjectsPage() {
 
   const unassignedProjects = activeProjects.filter((p) => !p.portfolio_id).sort(sortByName)
 
-  const { windowStart, windowEnd, months, timelineWidth } = useMemo(() => {
+  const { windowStart, windowEnd } = useMemo(() => {
     const { start, end } = buildGanttWindow(activeProjects)
-    const monthList = eachMonthOfInterval({ start, end })
-    return {
-      windowStart: start,
-      windowEnd: end,
-      months: monthList,
-      timelineWidth: monthList.length * MONTH_W,
-    }
+    return { windowStart: start, windowEnd: end }
   }, [activeProjects])
 
   const rows: Row[] = useMemo(() => {
@@ -449,8 +393,9 @@ export default function ProjectsPage() {
         ) : (
           <>
             {/* Left: project names */}
-            <div className="w-72 shrink-0 border-r">
-              <div className={cn(ROW_H, 'flex items-center border-b px-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground')}>
+            <div className="w-72 shrink-0 border-r flex flex-col">
+              <div className={cn(GANTT_TOOLBAR_H, 'border-b shrink-0')} />
+              <div className={cn(ROW_H, 'flex items-center border-b px-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground shrink-0')}>
                 Project
               </div>
               {rows.map((row, i) => {
@@ -496,50 +441,7 @@ export default function ProjectsPage() {
             </div>
 
             {/* Right: Gantt timeline */}
-            <div className="flex-1 overflow-x-auto">
-              <div style={{ minWidth: timelineWidth }}>
-                {/* Month headers */}
-                <div className={cn(ROW_H, 'flex border-b')}>
-                  {months.map((month) => (
-                    <div
-                      key={month.toISOString()}
-                      className="shrink-0 border-r border-border/40 px-2 flex items-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
-                      style={{ width: MONTH_W }}
-                    >
-                      {format(month, 'MMM yyyy')}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Gantt rows */}
-                {rows.map((row, i) => {
-                  if (row.kind === 'portfolio' || row.kind === 'unassigned_header') {
-                    return (
-                      <div
-                        key={`gantt-header-${i}`}
-                        className={cn(ROW_H, 'border-b border-border/40 bg-muted/20')}
-                      />
-                    )
-                  }
-                  if (row.kind === 'project') {
-                    return (
-                      <GanttBarRow
-                        key={`gantt-proj-${row.project.id}`}
-                        project={row.project}
-                        windowStart={windowStart}
-                        windowEnd={windowEnd}
-                      />
-                    )
-                  }
-                  if (row.kind === 'empty') {
-                    return (
-                      <div key={`gantt-empty-${i}`} className={cn(ROW_H, 'border-b border-border/40')} />
-                    )
-                  }
-                  return null
-                })}
-              </div>
-            </div>
+            <StructureGantt rows={rows} windowStart={windowStart} windowEnd={windowEnd} />
           </>
         )}
       </div>
