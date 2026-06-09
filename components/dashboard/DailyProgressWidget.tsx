@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { Clock, TrendingUp } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { isSameDay, parseISO } from 'date-fns'
+import { format } from 'date-fns'
 import { useTasks } from '@/lib/queries/useTasks'
 import { useTimeEntriesToday } from '@/lib/queries/useTimeEntries'
 import { formatDuration } from '@/lib/utils'
@@ -25,12 +25,9 @@ export function DailyProgressWidget() {
 
   const todayTasks = useMemo(() => {
     if (!allTasks) return []
-    const today = new Date()
+    const today = format(new Date(), 'yyyy-MM-dd')
     return allTasks.filter(
-      (t) =>
-        t.status !== 'cancelled' &&
-        t.scheduled_start &&
-        isSameDay(parseISO(t.scheduled_start), today)
+      (t) => t.status !== 'cancelled' && t.due_date === today
     )
   }, [allTasks])
 
