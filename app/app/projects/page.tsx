@@ -57,8 +57,8 @@ function buildGanttWindow(projects: Project[]) {
 
   const sorted = [...dates].sort()
   return {
-    start: subDays(parseISO(sorted[0]), 14),
-    end: addDays(parseISO(sorted[sorted.length - 1]), 14),
+    start: subDays(parseISO(sorted[0]), 90),
+    end: addDays(parseISO(sorted[sorted.length - 1]), 90),
   }
 }
 

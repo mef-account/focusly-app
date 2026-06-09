@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Minus, Plus } from 'lucide-react'
 import {
   eachDayOfInterval,
@@ -169,6 +169,10 @@ interface StructureGanttProps {
 export function StructureGantt({ rows, windowStart, windowEnd }: StructureGanttProps) {
   const [scale, setScale] = useState<GanttScale>('month')
   const [zoom, setZoom] = useState(1)
+  const [isDragging, setIsDragging] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const dragRef = useRef({ startX: 0, scrollLeft: 0 })
+  const isDraggingRef = useRef(false)
 
   const { columns, timelineWidth } = useMemo(
     () => buildColumns(scale, windowStart, windowEnd, zoom),
@@ -179,6 +183,40 @@ export function StructureGantt({ rows, windowStart, windowEnd }: StructureGanttP
     () => getTodayLeftPx(windowStart, windowEnd, timelineWidth),
     [windowStart, windowEnd, timelineWidth],
   )
+
+  const handleDragStart = useCallback((clientX: number) => {
+    const el = scrollRef.current
+    if (!el) return
+    isDraggingRef.current = true
+    setIsDragging(true)
+    dragRef.current = { startX: clientX, scrollLeft: el.scrollLeft }
+  }, [])
+
+  const handleDragMove = useCallback((clientX: number) => {
+    const el = scrollRef.current
+    if (!el || !isDraggingRef.current) return
+    const dx = clientX - dragRef.current.startX
+    el.scrollLeft = dragRef.current.scrollLeft - dx
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    isDraggingRef.current = false
+    setIsDragging(false)
+  }, [])
+
+  useEffect(() => {
+    if (!isDragging) return
+
+    const onMouseMove = (e: MouseEvent) => handleDragMove(e.clientX)
+    const onMouseUp = () => handleDragEnd()
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [isDragging, handleDragMove, handleDragEnd])
 
   return (
     <div className="flex flex-1 flex-col min-h-0 min-w-0">
@@ -219,8 +257,28 @@ export function StructureGantt({ rows, windowStart, windowEnd }: StructureGanttP
         </Button>
       </div>
 
-      {/* Scrollable timeline */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden">
+      {/* Scrollable timeline — drag to pan left/right */}
+      <div
+        ref={scrollRef}
+        className={cn(
+          'flex-1 overflow-x-auto overflow-y-hidden select-none',
+          isDragging ? 'cursor-grabbing' : 'cursor-grab',
+        )}
+        onMouseDown={(e) => {
+          if (e.button !== 0) return
+          handleDragStart(e.clientX)
+        }}
+        onTouchStart={(e) => {
+          if (e.touches.length !== 1) return
+          handleDragStart(e.touches[0].clientX)
+        }}
+        onTouchMove={(e) => {
+          if (!isDraggingRef.current || e.touches.length !== 1) return
+          e.preventDefault()
+          handleDragMove(e.touches[0].clientX)
+        }}
+        onTouchEnd={handleDragEnd}
+      >
         <div className="relative" style={{ minWidth: timelineWidth }}>
           {/* Today marker spans header + rows */}
           {todayLeftPx !== null && (
