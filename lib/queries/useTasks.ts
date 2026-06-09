@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { toError } from '@/lib/supabase/errors'
+import { toast } from 'sonner'
 import type { Task } from '@/types'
 
 const supabase = createClient()
@@ -126,6 +127,33 @@ export function useUpdateTask() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Task> & { id: string }) => {
+      // Look up current cached task for status guards
+      if (updates.status === 'todo' || updates.status === 'in_progress') {
+        const allCached = queryClient.getQueriesData<Task[]>({ queryKey: ['tasks'] })
+        let current: Task | undefined
+        for (const [, data] of allCached) {
+          current = (data as Task[] | undefined)?.find((t) => t.id === id)
+          if (current) break
+        }
+
+        const estimate  = updates.estimate_minutes ?? current?.estimate_minutes
+        const project   = updates.project_id       ?? current?.project_id
+        const priority  = updates.priority         ?? current?.priority
+        const assignee  = updates.assignee_id      ?? current?.assignee_id
+
+        if (updates.status === 'todo') {
+          if (!estimate) throw new Error('A task needs an estimate before moving to Todo.')
+          if (!project)  throw new Error('A task needs a project before moving to Todo.')
+        }
+
+        if (updates.status === 'in_progress') {
+          if (!estimate)                        throw new Error('A task needs an estimate before starting.')
+          if (!project)                         throw new Error('A task needs a project before starting.')
+          if (!priority || priority === 'none') throw new Error('A task needs a priority before starting.')
+          if (!assignee)                        throw new Error('A task needs an assignee before starting.')
+        }
+      }
+
       const { error } = await supabase.from('tasks').update(updates).eq('id', id)
       if (error) throw error
     },
@@ -137,8 +165,9 @@ export function useUpdateTask() {
       )
       return { previous }
     },
-    onError: (_err, _vars, ctx) => {
+    onError: (err, _vars, ctx) => {
       ctx?.previous?.forEach(([key, data]) => queryClient.setQueryData(key, data))
+      toast.error(err instanceof Error ? err.message : 'Could not update task.')
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
   })
@@ -148,6 +177,13 @@ export function useCreateTask() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (task: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
+      if (task.status === 'in_progress') {
+        if (!task.estimate_minutes)                      throw new Error('A task needs an estimate before starting.')
+        if (!task.project_id)                            throw new Error('A task needs a project before starting.')
+        if (!task.priority || task.priority === 'none')  throw new Error('A task needs a priority before starting.')
+        if (!task.assignee_id)                           throw new Error('A task needs an assignee before starting.')
+      }
+
       const { data: { user } } = await supabase.auth.getUser()
       const payload = { ...task, created_by: task.created_by ?? user?.id ?? null }
       const { data, error } = await supabase.from('tasks').insert(payload).select().single()
@@ -155,6 +191,9 @@ export function useCreateTask() {
       return data as Task
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Could not create task.')
+    },
   })
 }
 

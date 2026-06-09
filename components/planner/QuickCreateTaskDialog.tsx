@@ -21,16 +21,16 @@ import {
 import { useCreateTask } from '@/lib/queries/useTasks'
 import { useProjects } from '@/lib/queries/useProjects'
 import { parseEstimate } from '@/lib/utils'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 
 interface QuickCreateTaskDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** ISO scheduled_start to prefill (date + time of the clicked slot). */
-  scheduledStart: string | null
+  /** YYYY-MM-DD date string to prefill due_date. */
+  dueDate: string | null
 }
 
-export function QuickCreateTaskDialog({ open, onOpenChange, scheduledStart }: QuickCreateTaskDialogProps) {
+export function QuickCreateTaskDialog({ open, onOpenChange, dueDate }: QuickCreateTaskDialogProps) {
   const createTask = useCreateTask()
   const { data: projects = [] } = useProjects()
 
@@ -38,12 +38,11 @@ export function QuickCreateTaskDialog({ open, onOpenChange, scheduledStart }: Qu
   const [projectId, setProjectId] = useState<string | null>(null)
   const [estimate, setEstimate] = useState('')
 
-  // Default to first project whenever the dialog opens
   useEffect(() => {
     if (open && !projectId && projects.length) setProjectId(projects[0].id)
   }, [open, projects, projectId])
 
-  const when = scheduledStart ? format(new Date(scheduledStart), 'EEE, MMM d · HH:mm') : null
+  const when = dueDate ? format(parseISO(dueDate), 'EEE, MMM d') : null
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -59,8 +58,8 @@ export function QuickCreateTaskDialog({ open, onOpenChange, scheduledStart }: Qu
       assignee_id: null,
       created_by: null,
       start_date: null,
-      due_date: null,
-      scheduled_start: scheduledStart,
+      due_date: dueDate,
+      scheduled_start: null,
       estimate_minutes: parseEstimate(estimate) ?? null,
     })
 

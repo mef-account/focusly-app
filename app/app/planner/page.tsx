@@ -34,21 +34,21 @@ import { useTimeTotalsByTask } from '@/lib/queries/useTimeEntries'
 import { usePlannerStore } from '@/store/usePlannerStore'
 import { useTaskPanelStore } from '@/store/useTaskPanelStore'
 import { formatMinutes, formatDuration, cn } from '@/lib/utils'
-import type { Task, TaskPriority } from '@/types'
+import type { Task } from '@/types'
 
 // ─── Time grid config ─────────────────────────────────────────────────────────
-const START_MIN = 7 * 60 // 07:00
-const END_MIN = 22 * 60 // 22:00
-const PX_PER_SLOT = 34 // base zoom: px height of one interval slot (finer interval ⇒ more zoom)
-const DEFAULT_DUR = 30 // assumed minutes for tasks without an estimate
-const GUTTER = 46 // px for time labels
-const DAY_AVAILABLE_HOURS = (END_MIN - START_MIN) / 60
+const START_MIN = 7 * 60   // 07:00
+const END_MIN   = 22 * 60  // 22:00
+const PX_PER_SLOT = 34     // px height per slot at base zoom
+const DEFAULT_DUR = 30     // assumed minutes for tasks without an estimate
+const DEFAULT_START_MIN = 9 * 60 // 09:00 — default position for tasks without a time
+const GUTTER = 46          // px for time labels
 
 const ZOOM_OPTIONS = [
-  { label: '5m', value: 5 },
+  { label: '5m',  value: 5  },
   { label: '15m', value: 15 },
   { label: '30m', value: 30 },
-  { label: '1h', value: 60 },
+  { label: '1h',  value: 60 },
 ]
 
 function buildSlots(step: number): string[] {
@@ -59,6 +59,13 @@ function buildSlots(step: number): string[] {
   return out
 }
 
+/** Minutes since midnight — defaults to 09:00 when no ISO string is provided */
+function minutesOfDay(iso: string | null | undefined): number {
+  if (!iso) return DEFAULT_START_MIN
+  const d = parseISO(iso)
+  return d.getHours() * 60 + d.getMinutes()
+}
+
 function combineDateAndTime(date: Date, time: string): string {
   const [h, m] = time.split(':').map(Number)
   const d = new Date(date)
@@ -66,24 +73,16 @@ function combineDateAndTime(date: Date, time: string): string {
   return d.toISOString()
 }
 
-function minutesOfDay(iso: string): number {
-  const d = parseISO(iso)
-  return d.getHours() * 60 + d.getMinutes()
-}
-
 /** Assigns each overlapping task a column index + total columns (calendar-style). */
 function computeDayLayout(
   tasks: Task[],
-  pxPerMinute: number
+  pxPerMinute: number,
 ): Map<string, { col: number; cols: number }> {
   const layout = new Map<string, { col: number; cols: number }>()
-  // A block can't render shorter than MIN_BLOCK_PX, so treat its visual span as
-  // at least that many minutes. This lets close-together short tasks lay out
-  // side-by-side instead of stacking when zoomed out.
   const minVisualMin = MIN_BLOCK_PX / pxPerMinute
   const events = tasks
     .map((t) => {
-      const start = minutesOfDay(t.scheduled_start!)
+      const start = minutesOfDay(t.scheduled_start)
       const dur = Math.max(t.estimate_minutes ?? DEFAULT_DUR, minVisualMin)
       return { id: t.id, start, end: start + dur }
     })
@@ -216,7 +215,6 @@ function WeekTaskPill({
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `week::${task.id}` })
   const dur = task.estimate_minutes ?? DEFAULT_DUR
-  const startIso = parseISO(task.scheduled_start!)
 
   return (
     <div
@@ -230,11 +228,9 @@ function WeekTaskPill({
         isDragging && 'opacity-40'
       )}
     >
-      <div className="flex items-baseline justify-between gap-1">
-        <span className="text-[10px] tabular-nums text-muted-foreground">
-          {format(startIso, 'HH:mm')}–{format(addMinutes(startIso, dur), 'HH:mm')}
-        </span>
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between gap-1">
+        <span className="truncate text-[11px] font-medium leading-tight">{task.title}</span>
+        <div className="flex items-center gap-1.5 shrink-0">
           <span className="flex items-center gap-0.5 text-[10px] text-foreground" title="Estimate">
             <Timer className="h-2.5 w-2.5" />
             <span className="opacity-50">Est</span> {formatMinutes(dur)}
@@ -247,15 +243,22 @@ function WeekTaskPill({
           )}
         </div>
       </div>
-      <span className="truncate text-[11px] font-medium leading-tight">{task.title}</span>
-      <div className="flex items-center justify-end gap-1 pt-0.5">
-        <TaskTimerButton task={task} />
-        <AssigneePicker
-          value={task.assignee_id}
-          assignee={task.assignee}
-          stopPropagation
-          onChange={onAssigneeChange}
-        />
+      <div className="flex items-center justify-between">
+        {task.project && (
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: task.project.color }} />
+            {task.project.name}
+          </span>
+        )}
+        <div className="flex items-center gap-1 ml-auto">
+          <TaskTimerButton task={task} />
+          <AssigneePicker
+            value={task.assignee_id}
+            assignee={task.assignee}
+            stopPropagation
+            onChange={onAssigneeChange}
+          />
+        </div>
       </div>
     </div>
   )
@@ -328,7 +331,10 @@ function WeekDayColumn({
         className={cn('flex flex-1 flex-col gap-1 p-1 transition-colors', isOver && 'bg-primary/10')}
       >
         {tasks
-          .sort((a, b) => minutesOfDay(a.scheduled_start!) - minutesOfDay(b.scheduled_start!))
+          .sort((a, b) => {
+            const order = ['urgent', 'high', 'medium', 'low', 'none']
+            return order.indexOf(a.priority) - order.indexOf(b.priority)
+          })
           .map((t) => (
             <WeekTaskPill
               key={t.id}
@@ -343,7 +349,7 @@ function WeekDayColumn({
   )
 }
 
-// ─── Droppable time slot (right) ──────────────────────────────────────────────
+// ─── Droppable time slot (right panel) ────────────────────────────────────────
 function TimeSlot({
   date,
   time,
@@ -383,10 +389,10 @@ function TimeSlot({
   )
 }
 
-// ─── Draggable day-detail block (right) ───────────────────────────────────────
+// ─── Draggable day-detail block (right panel) ──────────────────────────────────
 const BLOCK_LEFT = GUTTER + 4
 const BLOCK_RIGHT_PAD = 6
-const MIN_BLOCK_PX = 30 // keep short tasks readable (single line, like a 30m block)
+const MIN_BLOCK_PX = 30
 
 function DayBlock({
   task,
@@ -413,29 +419,27 @@ function DayBlock({
   const previewRef = useRef<number | null>(null)
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null)
 
-  const start = minutesOfDay(task.scheduled_start!)
-  const top = (start - START_MIN) * pxPerMinute
+  const startMin = minutesOfDay(task.scheduled_start)
+  const top = (startMin - START_MIN) * pxPerMinute
   const dur = previewMin ?? task.estimate_minutes ?? DEFAULT_DUR
   const height = Math.max(MIN_BLOCK_PX, dur * pxPerMinute - 2)
 
   const suppressNextClick = () => {
     suppressClickRef.current = true
-    window.setTimeout(() => {
-      suppressClickRef.current = false
-    }, 150)
+    window.setTimeout(() => { suppressClickRef.current = false }, 150)
   }
 
   const startResize = (e: React.PointerEvent) => {
     e.stopPropagation()
     e.preventDefault()
     const startY = e.clientY
-    const startMin = task.estimate_minutes ?? DEFAULT_DUR
+    const startDur = task.estimate_minutes ?? DEFAULT_DUR
     const snap = Math.max(5, snapMinutes)
     setResizing(true)
 
     const onMove = (ev: PointerEvent) => {
       const deltaMin = (ev.clientY - startY) / pxPerMinute
-      let next = Math.round((startMin + deltaMin) / snap) * snap
+      let next = Math.round((startDur + deltaMin) / snap) * snap
       next = Math.max(snap, next)
       previewRef.current = next
       setPreviewMin(next)
@@ -448,7 +452,7 @@ function DayBlock({
       setResizing(false)
       setPreviewMin(null)
       suppressNextClick()
-      if (final && final !== startMin) onResize(task.id, final)
+      if (final && final !== startDur) onResize(task.id, final)
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
@@ -465,11 +469,10 @@ function DayBlock({
     onOpen()
   }
 
-  if (start < START_MIN || start >= END_MIN) return null
+  if (startMin < START_MIN || startMin >= END_MIN) return null
 
-  // Side-by-side columns when blocks overlap in time
   const totalPad = BLOCK_LEFT + BLOCK_RIGHT_PAD
-  const left = `calc(${BLOCK_LEFT}px + (100% - ${totalPad}px) * ${col} / ${cols})`
+  const left  = `calc(${BLOCK_LEFT}px + (100% - ${totalPad}px) * ${col} / ${cols})`
   const width = `calc((100% - ${totalPad}px) / ${cols} - 2px)`
 
   return (
@@ -489,11 +492,9 @@ function DayBlock({
         resizing && 'z-20 ring-1 ring-primary'
       )}
     >
-      {/* Drag + click area — separate from resize handle */}
       <div
         {...listeners}
         onPointerDown={(e) => {
-          // Record start position for click-vs-drag detection, then hand off to dnd-kit
           pointerStartRef.current = { x: e.clientX, y: e.clientY }
           ;(listeners as Record<string, (e: React.PointerEvent) => void>)?.onPointerDown?.(e)
         }}
@@ -501,10 +502,12 @@ function DayBlock({
         className="flex h-[calc(100%-8px)] cursor-grab flex-col px-2 py-1 active:cursor-grabbing"
       >
         <div className="flex items-baseline gap-1.5">
-          <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-            {format(parseISO(task.scheduled_start!), 'HH:mm')}–
-            {format(addMinutes(parseISO(task.scheduled_start!), dur), 'HH:mm')}
-          </span>
+          {task.scheduled_start && (
+            <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+              {format(parseISO(task.scheduled_start), 'HH:mm')}–
+              {format(addMinutes(parseISO(task.scheduled_start), dur), 'HH:mm')}
+            </span>
+          )}
           <span className="truncate text-[12px] font-medium leading-tight">{task.title}</span>
           {(task.estimate_minutes || resizing) && (
             <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
@@ -514,7 +517,6 @@ function DayBlock({
         </div>
       </div>
 
-      {/* Bottom resize handle: drag to change duration */}
       <div
         onPointerDown={startResize}
         className="absolute inset-x-0 bottom-0 flex h-2 cursor-ns-resize items-end justify-center"
@@ -552,7 +554,7 @@ export default function PlannerPage() {
   const [slotMinutes, setSlotMinutes] = useState(30)
   const [visibleDayIndices, setVisibleDayIndices] = useState<Set<number>>(() => {
     const jsDay = new Date().getDay()
-    const todayIdx = jsDay === 0 ? 6 : jsDay - 1 // 0=Mon … 6=Sun
+    const todayIdx = jsDay === 0 ? 6 : jsDay - 1
     const indices = new Set<number>()
     if (todayIdx > 0) indices.add(todayIdx - 1)
     indices.add(todayIdx)
@@ -560,23 +562,15 @@ export default function PlannerPage() {
     return indices
   })
 
-  const toggleDay = (i: number) => {
-    setVisibleDayIndices((prev) => {
-      const next = new Set(prev)
-      if (next.has(i) && next.size === 1) return prev // keep at least one day
-      next.has(i) ? next.delete(i) : next.add(i)
-      return next
-    })
-  }
   const blockClickSuppressRef = useRef(false)
-  const [quickCreate, setQuickCreate] = useState<{ open: boolean; iso: string | null }>({
+  const [quickCreate, setQuickCreate] = useState<{ open: boolean; dueDate: string | null }>({
     open: false,
-    iso: null,
+    dueDate: null,
   })
 
   const slots = useMemo(() => buildSlots(slotMinutes), [slotMinutes])
 
-  // Measure the day-grid viewport so we can guarantee the grid fills it (no dead space).
+  // Measure the day-grid viewport so the grid fills it completely.
   const gridScrollRef = useRef<HTMLDivElement>(null)
   const [viewportH, setViewportH] = useState(0)
   useEffect(() => {
@@ -588,13 +582,21 @@ export default function PlannerPage() {
     return () => ro.disconnect()
   }, [])
 
-  // Per-interval zoom (finer = taller), but never shorter than the viewport.
-  const coveredMin = slots.length * slotMinutes
-  const basePxPerMin = PX_PER_SLOT / slotMinutes
+  const coveredMin    = slots.length * slotMinutes
+  const basePxPerMin  = PX_PER_SLOT / slotMinutes
   const floorPxPerMin = viewportH > 0 ? viewportH / coveredMin : 0
-  const pxPerMinute = Math.max(basePxPerMin, floorPxPerMin)
-  const slotHeight = slotMinutes * pxPerMinute
-  const dayHeight = slots.length * slotHeight
+  const pxPerMinute   = Math.max(basePxPerMin, floorPxPerMin)
+  const slotHeight    = slotMinutes * pxPerMinute
+  const dayHeight     = slots.length * slotHeight
+
+  const toggleDay = (i: number) => {
+    setVisibleDayIndices((prev) => {
+      const next = new Set(prev)
+      if (next.has(i) && next.size === 1) return prev
+      next.has(i) ? next.delete(i) : next.add(i)
+      return next
+    })
+  }
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -608,10 +610,10 @@ export default function PlannerPage() {
     [weekDays, visibleDayIndices]
   )
 
-  // Inbox = unscheduled, in-progress tasks (filtered by project)
+  // ── Inbox: in_progress tasks with no due_date ───────────────────────────────
   const inboxTasks = useMemo(() => {
     return tasks.filter((t) => {
-      if (t.scheduled_start) return false
+      if (t.due_date) return false
       if (t.status !== 'in_progress') return false
       if (inboxFilter.projectId && t.project_id !== inboxFilter.projectId) return false
       return true
@@ -625,22 +627,34 @@ export default function PlannerPage() {
       .filter((g) => g.items.length > 0)
   }, [inboxTasks])
 
-  const scheduledTasks = useMemo(() => tasks.filter((t) => t.scheduled_start && t.status !== 'cancelled'), [tasks])
+  // ── Scheduled: tasks with a due_date, not cancelled ─────────────────────────
+  const scheduledTasks = useMemo(
+    () => tasks.filter((t) => t.due_date && t.status !== 'cancelled'),
+    [tasks]
+  )
 
   const { data: timeTotals = {} } = useTimeTotalsByTask(
     [...inboxTasks, ...scheduledTasks].map((t) => t.id)
   )
 
+  // Week columns: group by due_date
   const tasksForDay = (day: Date) =>
-    scheduledTasks.filter((t) => isSameDay(parseISO(t.scheduled_start!), day))
+    scheduledTasks.filter((t) => t.due_date === format(day, 'yyyy-MM-dd'))
 
-  const dayDetailTasks = useMemo(() => tasksForDay(selectedDay), [scheduledTasks, selectedDay]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Right panel: same filter — tasks positioned using scheduled_start for time,
+  // defaulting to 09:00 when no time is set.
+  const dayDetailTasks = useMemo(
+    () => tasksForDay(selectedDay),
+    [scheduledTasks, selectedDay] // eslint-disable-line react-hooks/exhaustive-deps
+  )
+
   const dayLayout = useMemo(
     () => computeDayLayout(dayDetailTasks, pxPerMinute),
     [dayDetailTasks, pxPerMinute]
   )
 
-  const dayBudgetMinutes = dayDetailTasks.reduce((sum, t) => sum + (t.estimate_minutes ?? DEFAULT_DUR), 0)
+  const dayBudgetMinutes  = dayDetailTasks.reduce((sum, t) => sum + (t.estimate_minutes ?? DEFAULT_DUR), 0)
+  const DAY_AVAILABLE_HOURS = (END_MIN - START_MIN) / 60
   const budgetPct = Math.min(100, Math.round((dayBudgetMinutes / (DAY_AVAILABLE_HOURS * 60)) * 100))
 
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) ?? null : null
@@ -654,15 +668,15 @@ export default function PlannerPage() {
 
       if (e.key === 't' || e.key === 'T') {
         e.preventDefault()
-        updateTask.mutate({ id: selectedTaskId, scheduled_start: combineDateAndTime(new Date(), '09:00') })
+        updateTask.mutate({ id: selectedTaskId, due_date: format(new Date(), 'yyyy-MM-dd') })
         setSelectedTaskId(null)
       } else if (e.key === 'ArrowRight') {
         e.preventDefault()
-        updateTask.mutate({ id: selectedTaskId, scheduled_start: combineDateAndTime(addDays(new Date(), 1), '09:00') })
+        updateTask.mutate({ id: selectedTaskId, due_date: format(addDays(new Date(), 1), 'yyyy-MM-dd') })
         setSelectedTaskId(null)
       } else if (e.key === 'Backspace') {
         e.preventDefault()
-        updateTask.mutate({ id: selectedTaskId, scheduled_start: null })
+        updateTask.mutate({ id: selectedTaskId, due_date: null, status: 'in_progress' })
         setSelectedTaskId(null)
       } else if (e.key === 'Enter') {
         e.preventDefault()
@@ -682,40 +696,37 @@ export default function PlannerPage() {
   function handleDragEnd(e: DragEndEvent) {
     setActiveId(null)
     blockClickSuppressRef.current = true
-    window.setTimeout(() => {
-      blockClickSuppressRef.current = false
-    }, 150)
+    window.setTimeout(() => { blockClickSuppressRef.current = false }, 150)
 
     const { active, over } = e
     if (!over) return
 
-    // Strip context prefix (week:: / day::) added to avoid duplicate dnd-kit IDs
     const rawId = active.id as string
     const taskId = rawId.includes('::') ? rawId.split('::')[1] : rawId
-
     const data = over.data.current as { inbox?: boolean; date?: Date; time?: string } | undefined
 
-    // Dropped on inbox → unschedule the task
+    // Drop on inbox → remove due_date and set status to in_progress
     if (data?.inbox) {
-      updateTask.mutate({ id: taskId, scheduled_start: null })
+      updateTask.mutate({ id: taskId, due_date: null, status: 'in_progress' })
       return
     }
 
     if (!data?.date) return
 
-    // If dropped on a day column (no time slot), preserve the task's original time
-    let time = data.time
-    if (!time) {
-      const dragged = tasks.find((t) => t.id === taskId)
-      time = dragged?.scheduled_start
-        ? format(parseISO(dragged.scheduled_start), 'HH:mm')
-        : '09:00'
+    const dateStr = format(data.date, 'yyyy-MM-dd')
+
+    // If dropped on a time slot in the right panel, also set scheduled_start
+    if (data.time) {
+      updateTask.mutate({
+        id: taskId,
+        due_date: dateStr,
+        scheduled_start: combineDateAndTime(data.date, data.time),
+      })
+      return
     }
 
-    updateTask.mutate({
-      id: taskId,
-      scheduled_start: combineDateAndTime(data.date, time),
-    })
+    // Dropped on a week day column — set only due_date, preserve existing time if any
+    updateTask.mutate({ id: taskId, due_date: dateStr })
   }
 
   return (
@@ -726,12 +737,11 @@ export default function PlannerPage() {
       onDragCancel={() => {
         setActiveId(null)
         blockClickSuppressRef.current = true
-        window.setTimeout(() => {
-          blockClickSuppressRef.current = false
-        }, 150)
+        window.setTimeout(() => { blockClickSuppressRef.current = false }, 150)
       }}
     >
       <div className="-m-6 flex h-[calc(100vh-3.5rem)] overflow-hidden">
+
         {/* ─── Left: Task Inbox ─── */}
         <div className="flex w-64 shrink-0 flex-col border-r">
           <div className="flex items-center gap-2 border-b px-3 py-2">
@@ -740,7 +750,6 @@ export default function PlannerPage() {
             <span className="ml-auto text-xs text-muted-foreground">{inboxTasks.length}</span>
           </div>
 
-          {/* Filters */}
           <div className="flex flex-col gap-2 border-b p-2">
             <Select
               value={inboxFilter.projectId ?? 'all'}
@@ -758,37 +767,36 @@ export default function PlannerPage() {
             </Select>
           </div>
 
-          {/* Inbox list — also a drop target to unschedule a task */}
           <DroppableInbox>
-          <div className="flex-1 space-y-3 overflow-y-auto p-2">
-            {inboxByPriority.length === 0 ? (
-              <p className="px-1 py-8 text-center text-xs text-muted-foreground">
-                Nothing to schedule. Drag tasks here by clearing their date.
-              </p>
-            ) : (
-              inboxByPriority.map((group) => (
-                <div key={group.priority} className="space-y-1">
-                  <div className="flex items-center gap-1.5 px-1">
-                    <PriorityIcon priority={group.priority} />
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {group.priority === 'none' ? 'No priority' : group.priority}
-                    </span>
+            <div className="flex-1 space-y-3 overflow-y-auto p-2">
+              {inboxByPriority.length === 0 ? (
+                <p className="px-1 py-8 text-center text-xs text-muted-foreground">
+                  Nothing to schedule. Drag tasks here by clearing their date.
+                </p>
+              ) : (
+                inboxByPriority.map((group) => (
+                  <div key={group.priority} className="space-y-1">
+                    <div className="flex items-center gap-1.5 px-1">
+                      <PriorityIcon priority={group.priority} />
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {group.priority === 'none' ? 'No priority' : group.priority}
+                      </span>
+                    </div>
+                    {group.items.map((t) => (
+                      <InboxCard
+                        key={t.id}
+                        task={t}
+                        selected={selectedTaskId === t.id}
+                        onSelect={() => setSelectedTaskId(t.id)}
+                        onOpen={() => openTaskSheet(t.id)}
+                        loggedSeconds={timeTotals[t.id]}
+                        onAssigneeChange={(id) => updateTask.mutate({ id: t.id, assignee_id: id })}
+                      />
+                    ))}
                   </div>
-                  {group.items.map((t) => (
-                    <InboxCard
-                      key={t.id}
-                      task={t}
-                      selected={selectedTaskId === t.id}
-                      onSelect={() => setSelectedTaskId(t.id)}
-                      onOpen={() => openTaskSheet(t.id)}
-                      loggedSeconds={timeTotals[t.id]}
-                      onAssigneeChange={(id) => updateTask.mutate({ id: t.id, assignee_id: id })}
-                    />
-                  ))}
-                </div>
-              ))
-            )}
-          </div>
+                ))
+              )}
+            </div>
           </DroppableInbox>
 
           <div className="border-t px-3 py-1.5 text-[10px] text-muted-foreground">
@@ -817,7 +825,6 @@ export default function PlannerPage() {
                 </Button>
               </div>
             </div>
-            {/* Day-of-week visibility toggles */}
             <div className="flex items-center gap-1 px-3 pb-2">
               {weekDays.map((day, i) => (
                 <button
@@ -851,7 +858,7 @@ export default function PlannerPage() {
           </div>
         </div>
 
-        {/* ─── Right: Day Detail ─── */}
+        {/* ─── Right: Day Detail (time grid) ─── */}
         <div className="flex w-[28rem] shrink-0 flex-col border-l">
           <div className="border-b px-3 py-2">
             <div className="flex items-center justify-between">
@@ -898,7 +905,7 @@ export default function PlannerPage() {
                   slotMinutes={slotMinutes}
                   height={slotHeight}
                   onQuickCreate={(t) =>
-                    setQuickCreate({ open: true, iso: combineDateAndTime(selectedDay, t) })
+                    setQuickCreate({ open: true, dueDate: format(selectedDay, 'yyyy-MM-dd') })
                   }
                 />
               ))}
@@ -940,7 +947,7 @@ export default function PlannerPage() {
       <QuickCreateTaskDialog
         open={quickCreate.open}
         onOpenChange={(o) => setQuickCreate((s) => ({ ...s, open: o }))}
-        scheduledStart={quickCreate.iso}
+        dueDate={quickCreate.dueDate}
       />
       <TaskSheet />
     </DndContext>

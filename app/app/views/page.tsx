@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense } from 'react'
 import React from 'react'
+import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   Save,
@@ -17,7 +18,7 @@ import { useTasks, useUpdateTask } from '@/lib/queries/useTasks'
 import { useTimeTotalsByTask } from '@/lib/queries/useTimeEntries'
 import { useProjects } from '@/lib/queries/useProjects'
 import { useProfiles } from '@/lib/queries/useProfiles'
-import { useWorkspace } from '@/lib/queries/useWorkspace'
+import { useWorkspaces } from '@/lib/queries/useWorkspace'
 import { useViews, useCreateView, useUpdateView, useDeleteView } from '@/lib/queries/useViews'
 import { useTaskPanelStore } from '@/store/useTaskPanelStore'
 import { createClient } from '@/lib/supabase/client'
@@ -49,14 +50,14 @@ import type { Task, TaskStatus, TaskPriority, ViewGroupBy } from '@/types'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 const DEFAULT_DISPLAY: DisplayOptions = {
-  groupBy: 'project',
-  sortField: 'priority',
+  groupBy: 'none',
+  sortField: 'created_at',
   sortDir: 'asc',
-  visibleColumns: ['status', 'assignee', 'priority', 'project', 'start_date', 'due_date', 'created_at'],
+  visibleColumns: ['status', 'assignee', 'priority', 'project', 'due_date', 'created_at'],
 }
 
 const DEFAULT_FILTERS: ActiveFilters = {
-  statuses: [],
+  statuses: ['backlog'],
   priorities: [],
   projectIds: [],
   assigneeIds: [],
@@ -171,15 +172,14 @@ function viewFiltersToActive(vf: { field: string; operator: string; value: unkno
 
 // ─── Column resize ────────────────────────────────────────────────────────────
 
-const COL_PERSIST_KEY = 'focusly:views-col-widths'
+const COL_PERSIST_KEY = 'focusly:views-col-widths-v4'
 
 const DEFAULT_COL_WIDTHS: Record<string, number> = {
   title:            380,
-  status:            80,
+  status:            28,
   priority:         110,
   assignee:          60,
   project:          160,
-  start_date:       110,
   due_date:         110,
   created_at:       110,
   estimate_minutes:  90,
@@ -201,7 +201,7 @@ function useColWidths() {
     const startX = e.clientX
     const startW = widths[col] ?? DEFAULT_COL_WIDTHS[col] ?? 80
     const onMove = (mv: MouseEvent) => {
-      const next = Math.max(50, startW + mv.clientX - startX)
+      const next = Math.max(32, startW + mv.clientX - startX)
       setWidths((prev) => ({ ...prev, [col]: next }))
     }
     const onUp = () => {
@@ -237,7 +237,8 @@ function ViewsPageInner() {
   const { data: tasks = [], isLoading } = useTasks()
   const { data: projects = [] } = useProjects()
   const { data: profiles = [] } = useProfiles()
-  const { data: workspace } = useWorkspace()
+  const { data: workspaces = [] } = useWorkspaces()
+  const workspace = workspaces[0]
   const { data: savedViews = [] } = useViews()
   const { data: timeTotals = {} } = useTimeTotalsByTask(tasks.map((t) => t.id))
   const updateTask = useUpdateTask()
@@ -248,7 +249,7 @@ function ViewsPageInner() {
 
   const [filters, setFilters] = useState<ActiveFilters>(DEFAULT_FILTERS)
   const [display, setDisplay] = useState<DisplayOptions>(DEFAULT_DISPLAY)
-  const [viewName, setViewName] = useState('All Tasks')
+  const [viewName, setViewName] = useState('Backlog')
   const [isDirty, setIsDirty] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
@@ -258,6 +259,7 @@ function ViewsPageInner() {
   const { widths: colW, startResize } = useColWidths()
 
   const activeView = savedViews.find((v) => v.id === viewId) ?? null
+  const sortedViews = [...savedViews].sort((a, b) => a.name.localeCompare(b.name))
 
   // Load saved view when URL param changes
   useEffect(() => {
@@ -272,7 +274,7 @@ function ViewsPageInner() {
       })
       setIsDirty(false)
     } else if (!viewId) {
-      setViewName('All Tasks')
+      setViewName('Backlog')
       setFilters(DEFAULT_FILTERS)
       setDisplay(DEFAULT_DISPLAY)
       setIsDirty(false)
@@ -491,6 +493,31 @@ function ViewsPageInner() {
         </div>
       </div>
 
+      {/* ── View tabs ── */}
+      <div className="flex items-center gap-1 border-b px-6 py-1.5">
+        <Link
+          href="/app/views"
+          className={cn(
+            'rounded-md px-3 py-1 text-sm font-medium transition-colors',
+          !viewId ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50'
+            )}
+          >
+            Backlog
+          </Link>
+        {sortedViews.map((v) => (
+          <Link
+            key={v.id}
+            href={`/app/views?view=${v.id}`}
+            className={cn(
+              'rounded-md px-3 py-1 text-sm font-medium transition-colors',
+              viewId === v.id ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50'
+            )}
+          >
+            {v.name}
+          </Link>
+        ))}
+      </div>
+
       {/* ── Search bar ── */}
       <div className="border-b px-6 py-2">
         <Input
@@ -512,12 +539,11 @@ function ViewsPageInner() {
             {/* Colgroup ensures all rows — header, group, task — use identical widths */}
             <colgroup>
               <col style={{ width: 36 }} />
-              <col style={{ width: colW['title'] }} />
               {showCol('status')           && <col style={{ width: colW['status'] }} />}
+              <col style={{ width: colW['title'] }} />
               {showCol('priority')         && <col style={{ width: colW['priority'] }} />}
               {showCol('assignee')         && <col style={{ width: colW['assignee'] }} />}
               {showCol('project')          && <col style={{ width: colW['project'] }} />}
-              {showCol('start_date')       && <col style={{ width: colW['start_date'] }} />}
               {showCol('due_date')         && <col style={{ width: colW['due_date'] }} />}
               {showCol('created_at')       && <col style={{ width: colW['created_at'] }} />}
               {showCol('estimate_minutes') && <col style={{ width: colW['estimate_minutes'] }} />}
@@ -528,17 +554,16 @@ function ViewsPageInner() {
             <thead className="sticky top-0 z-10 border-b bg-background">
               <tr>
                 <th style={{ width: 36 }} className="h-8 px-2 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground">#</th>
-                <ColHeader label="Task" col="title" width={colW['title']} onResize={startResize} />
                 {showCol('status')           && <ColHeader label="Status"       col="status"           width={colW['status']}           onResize={startResize} />}
+                <ColHeader label="Task" col="title" width={colW['title']} onResize={startResize} />
                 {showCol('priority')         && <ColHeader label="Priority"     col="priority"         width={colW['priority']}         onResize={startResize} />}
                 {showCol('assignee')         && <ColHeader label="Assignee"     col="assignee"         width={colW['assignee']}         onResize={startResize} />}
                 {showCol('project')          && <ColHeader label="Project"      col="project"          width={colW['project']}          onResize={startResize} />}
-                {showCol('start_date')       && <ColHeader label="Start date"   col="start_date"       width={colW['start_date']}       onResize={startResize} />}
                 {showCol('due_date')         && <ColHeader label="Due date"     col="due_date"         width={colW['due_date']}         onResize={startResize} />}
                 {showCol('created_at')       && <ColHeader label="Created date" col="created_at"       width={colW['created_at']}       onResize={startResize} />}
                 {showCol('estimate_minutes') && <ColHeader label="Estimate"     col="estimate_minutes" width={colW['estimate_minutes']} onResize={startResize} />}
                 {showCol('logged')           && <ColHeader label="Logged"       col="logged"           width={colW['logged']}           onResize={startResize} />}
-                <th style={{ width: 44 }} className="h-7 px-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground select-none whitespace-nowrap">Timer</th>
+                <th style={{ width: 44 }} className="h-7 px-2 text-center text-xs font-medium uppercase tracking-wide text-muted-foreground select-none whitespace-nowrap">Timer</th>
                 <th style={{ width: 44 }} className="h-8 px-2" />
               </tr>
             </thead>
@@ -553,10 +578,8 @@ function ViewsPageInner() {
                     return next
                   })
 
-                // Aggregate: earliest start_date and latest due_date in this group
-                const startDates = group.tasks.map((t) => t.start_date).filter(Boolean) as string[]
+                // Aggregate: latest due_date in this group
                 const dueDates = group.tasks.map((t) => t.due_date).filter(Boolean) as string[]
-                const minStart = startDates.length ? startDates.sort()[0] : null
                 const maxDue = dueDates.length ? dueDates.sort().reverse()[0] : null
 
                 // Totals for group header
@@ -573,6 +596,7 @@ function ViewsPageInner() {
                         onClick={toggle}
                       >
                         <td style={{ width: 36 }} className="h-7" />
+                        {showCol('status') && <td style={{ width: colW['status'] }} />}
                         <td style={{ width: colW['title'] }} className="h-7 px-4">
                           <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
                             {collapsed ? (
@@ -597,16 +621,9 @@ function ViewsPageInner() {
                             )}
                           </span>
                         </td>
-                        {/* Aggregate dates aligned with Start/Due columns */}
-                        {showCol('status') && <td style={{ width: colW['status'] }} />}
                         {showCol('priority') && <td style={{ width: colW['priority'] }} />}
                         {showCol('assignee') && <td style={{ width: colW['assignee'] }} />}
                         {showCol('project') && <td style={{ width: colW['project'] }} />}
-                        {showCol('start_date') && (
-                          <td style={{ width: colW['start_date'] }} className="h-7 px-2 text-xs text-muted-foreground tabular-nums">
-                            {minStart ? formatDate(minStart) : ''}
-                          </td>
-                        )}
                         {showCol('due_date') && (
                           <td style={{ width: colW['due_date'] }} className="h-7 px-2 text-xs text-muted-foreground tabular-nums">
                             {maxDue ? formatDate(maxDue) : ''}
@@ -632,7 +649,6 @@ function ViewsPageInner() {
                           showPriority={showCol('priority')}
                           showAssignee={showCol('assignee')}
                           showProject={showCol('project')}
-                          showStartDate={showCol('start_date')}
                           showDue={showCol('due_date')}
                           showCreatedAt={showCol('created_at')}
                           showEstimate={showCol('estimate_minutes')}
@@ -689,7 +705,7 @@ function ColHeader({ label, col, width, onResize }: {
   return (
     <th
       style={{ width }}
-      className="group/th relative h-8 px-2 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground overflow-hidden"
+      className="group/th relative h-8 px-2 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground overflow-hidden"
     >
       <span className="truncate">{label}</span>
       <div
@@ -716,7 +732,6 @@ interface TaskRowProps {
   showPriority: boolean
   showAssignee: boolean
   showProject: boolean
-  showStartDate: boolean
   showDue: boolean
   showCreatedAt: boolean
   showEstimate: boolean
@@ -744,7 +759,6 @@ function TaskRow({
   showPriority,
   showAssignee,
   showProject,
-  showStartDate,
   showDue,
   showCreatedAt,
   showEstimate,
@@ -765,14 +779,10 @@ function TaskRow({
         {rowNum}
       </td>
 
-      {/* Title */}
-      <td style={{ width: colW['title'] }} className="h-7 pl-8 pr-3">
-        <span className="truncate block text-[13px]">{task.title}</span>
-      </td>
-
       {/* Status — icon only */}
       {showStatus && (
-        <td style={{ width: colW['status'] }} className="h-7 px-2" onClick={(e) => e.stopPropagation()}>
+        <td style={{ width: colW['status'] }} className="h-7 px-1 text-center" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-center">
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
@@ -794,8 +804,14 @@ function TaskRow({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </td>
       )}
+
+      {/* Title */}
+      <td style={{ width: colW['title'] }} className="h-7 pl-8 pr-3">
+        <span className="truncate block text-[13px]">{task.title}</span>
+      </td>
 
       {/* Priority */}
       {showPriority && (
@@ -843,13 +859,6 @@ function TaskRow({
         </td>
       )}
 
-      {/* Start date */}
-      {showStartDate && (
-        <td style={{ width: colW['start_date'] }} className="h-7 px-2">
-          <span className="text-xs text-muted-foreground tabular-nums">{formatDate(task.start_date) || '—'}</span>
-        </td>
-      )}
-
       {/* Due date — red when overdue */}
       {showDue && (
         <td style={{ width: colW['due_date'] }} className="h-7 px-2">
@@ -888,7 +897,9 @@ function TaskRow({
 
       {/* Timer */}
       <td style={{ width: 44 }} className="h-7 px-2" onClick={(e) => e.stopPropagation()}>
-        <TaskTimerButton task={task} />
+        <div className="flex items-center justify-center">
+          <TaskTimerButton task={task} />
+        </div>
       </td>
     </tr>
   )

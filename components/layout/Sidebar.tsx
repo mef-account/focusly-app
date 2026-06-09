@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   FolderKanban,
@@ -14,19 +14,15 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
   Zap,
   SquarePen,
-  Dot,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSidebarStore } from '@/store/useSidebarStore'
 import { useQuickCreateStore } from '@/store/useQuickCreateStore'
-import { useViews } from '@/lib/queries/useViews'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
-import { useState, Suspense } from 'react'
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
@@ -43,8 +39,6 @@ export function Sidebar() {
   const pathname = usePathname()
   const { collapsed, toggle } = useSidebarStore()
   const openQuickCreate = useQuickCreateStore((s) => s.open)
-  const { data: savedViews = [] } = useViews()
-  const [viewsExpanded, setViewsExpanded] = useState(true)
 
   return (
     <aside
@@ -86,45 +80,24 @@ export function Sidebar() {
       {/* Nav */}
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
         {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
-          const isViews = label === 'Views'
-          const active = isViews
-            ? pathname.startsWith(href)
-            : pathname.startsWith(href)
+          const active = pathname.startsWith(href)
 
           const item = (
             <div key={href}>
-              <div className="flex items-center">
-                <Link
-                  href={href}
-                  className={cn(
-                    'flex flex-1 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                    'hover:bg-accent hover:text-accent-foreground',
-                    active
-                      ? 'bg-accent text-accent-foreground'
-                      : 'text-muted-foreground',
-                    collapsed && 'justify-center px-2'
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {!collapsed && label}
-                </Link>
-                {/* Expand/collapse arrow for Views when not collapsed */}
-                {isViews && !collapsed && savedViews.length > 0 && (
-                  <button
-                    onClick={() => setViewsExpanded((v) => !v)}
-                    className="mr-1 flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-                  >
-                    <ChevronDown
-                      className={cn('h-3 w-3 transition-transform', !viewsExpanded && '-rotate-90')}
-                    />
-                  </button>
+              <Link
+                href={href}
+                className={cn(
+                  'flex flex-1 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  'hover:bg-accent hover:text-accent-foreground',
+                  active
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-muted-foreground',
+                  collapsed && 'justify-center px-2'
                 )}
-              </div>
-
-              {/* Saved views sub-list */}
-              {isViews && !collapsed && viewsExpanded && savedViews.length > 0 && (
-                <ViewSubList savedViews={savedViews} />
-              )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {!collapsed && label}
+              </Link>
             </div>
           )
 
@@ -210,39 +183,3 @@ export function Sidebar() {
   )
 }
 
-// ─── Saved views sub-list ─────────────────────────────────────────────────────
-
-function ViewSubList({ savedViews }: { savedViews: import('@/types').SavedView[] }) {
-  // useSearchParams requires Suspense boundary — wrap usage here
-  return (
-    <Suspense>
-      <ViewSubListInner savedViews={savedViews} />
-    </Suspense>
-  )
-}
-
-function ViewSubListInner({ savedViews }: { savedViews: import('@/types').SavedView[] }) {
-  const searchParams = useSearchParams()
-  const activeViewId = searchParams.get('view')
-
-  return (
-    <div className="ml-4 mt-0.5 space-y-0.5">
-      {savedViews.map((view) => (
-        <Link
-          key={view.id}
-          href={`/app/views?view=${view.id}`}
-          className={cn(
-            'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors',
-            'hover:bg-accent hover:text-accent-foreground',
-            activeViewId === view.id
-              ? 'bg-accent text-accent-foreground'
-              : 'text-muted-foreground'
-          )}
-        >
-          <Dot className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">{view.name}</span>
-        </Link>
-      ))}
-    </div>
-  )
-}

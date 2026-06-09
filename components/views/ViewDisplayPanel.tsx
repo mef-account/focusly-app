@@ -19,7 +19,6 @@ export const ALL_COLUMNS = [
   { id: 'assignee', label: 'Assignee' },
   { id: 'priority', label: 'Priority' },
   { id: 'project', label: 'Project' },
-  { id: 'start_date', label: 'Start date' },
   { id: 'due_date', label: 'Due date' },
   { id: 'created_at', label: 'Created date' },
   { id: 'estimate_minutes', label: 'Estimate' },
