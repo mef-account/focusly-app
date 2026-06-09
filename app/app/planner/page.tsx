@@ -230,7 +230,10 @@ function WeekTaskPill({
       )}
     >
       <div className="flex items-center justify-between gap-1">
-        <span className="truncate text-[11px] font-medium leading-tight">{task.title}</span>
+        <div className="flex items-center gap-1 min-w-0">
+          <StatusIcon status={task.status} />
+          <span className="truncate text-[11px] font-medium leading-tight">{task.title}</span>
+        </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <span className="flex items-center gap-0.5 text-[10px] text-foreground" title="Estimate">
             <Timer className="h-2.5 w-2.5" />
@@ -502,7 +505,8 @@ function DayBlock({
         onClick={handleOpen}
         className="flex h-[calc(100%-8px)] cursor-grab flex-col px-2 py-1 active:cursor-grabbing"
       >
-        <div className="flex items-baseline gap-1.5">
+        <div className="flex items-center gap-1.5">
+          <StatusIcon status={task.status} />
           {task.scheduled_start && (
             <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
               {format(parseISO(task.scheduled_start), 'HH:mm')}–
