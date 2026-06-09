@@ -53,7 +53,7 @@ export function EditPortfolioDialog({ portfolio, open, onOpenChange }: EditPortf
       name: name.trim(),
       description: description.trim() || null,
       color,
-      workspace_id: workspaceId,
+      workspace_id: workspaceId ?? undefined,
     })
     onOpenChange(false)
   }
