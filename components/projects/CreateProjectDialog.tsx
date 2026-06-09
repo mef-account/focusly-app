@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -29,9 +29,10 @@ const COLORS = [
 interface CreateProjectDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  defaultPortfolioId?: string | null
 }
 
-export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogProps) {
+export function CreateProjectDialog({ open, onOpenChange, defaultPortfolioId }: CreateProjectDialogProps) {
   const { data: workspaces = [] } = useWorkspaces()
   const createProject = useCreateProject()
   const { data: portfolios = [] } = usePortfolios()
@@ -41,6 +42,19 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   const [color, setColor] = useState(COLORS[0])
   const [portfolioId, setPortfolioId] = useState<string | null>('none')
   const [workspaceId, setWorkspaceId] = useState<string | null>('none')
+
+  useEffect(() => {
+    if (!open) return
+
+    if (defaultPortfolioId) {
+      const portfolio = portfolios.find((p) => p.id === defaultPortfolioId)
+      setPortfolioId(defaultPortfolioId)
+      setWorkspaceId(portfolio?.workspace_id ?? 'none')
+    } else {
+      setPortfolioId('none')
+      setWorkspaceId('none')
+    }
+  }, [open, defaultPortfolioId, portfolios])
 
   // When workspaces load, default to the first one
   const effectiveWorkspaceId = workspaceId !== 'none' ? workspaceId : workspaces[0]?.id

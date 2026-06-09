@@ -284,6 +284,7 @@ export default function ProjectsPage() {
   const { data: portfolios = [], isLoading: loadingPortfolios } = usePortfolios()
 
   const [projectDialogOpen, setProjectDialogOpen] = useState(false)
+  const [createForPortfolioId, setCreateForPortfolioId] = useState<string | null>(null)
   const [portfolioDialogOpen, setPortfolioDialogOpen] = useState(false)
   const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false)
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
@@ -361,6 +362,16 @@ export default function ProjectsPage() {
     })
   }
 
+  function openProjectDialog(portfolioId?: string) {
+    setCreateForPortfolioId(portfolioId ?? null)
+    setProjectDialogOpen(true)
+  }
+
+  function handleProjectDialogChange(open: boolean) {
+    setProjectDialogOpen(open)
+    if (!open) setCreateForPortfolioId(null)
+  }
+
   return (
     <div className="flex h-full flex-col gap-0">
       {/* Header */}
@@ -378,7 +389,7 @@ export default function ProjectsPage() {
           <Button variant="outline" size="sm" onClick={() => setPortfolioDialogOpen(true)} className="gap-1.5 text-xs h-8">
             <LayoutGrid className="h-3.5 w-3.5" /> Portfolio
           </Button>
-          <Button size="sm" onClick={() => setProjectDialogOpen(true)} className="gap-1.5 text-xs h-8">
+          <Button size="sm" onClick={() => openProjectDialog()} className="gap-1.5 text-xs h-8">
             <Plus className="h-3.5 w-3.5" /> Project
           </Button>
         </div>
@@ -428,7 +439,7 @@ export default function ProjectsPage() {
               <p className="font-medium">No projects yet</p>
               <p className="text-sm text-muted-foreground">Create a project to get started</p>
             </div>
-            <Button onClick={() => setProjectDialogOpen(true)} variant="outline" className="gap-2 mt-2">
+            <Button onClick={() => openProjectDialog()} variant="outline" className="gap-2 mt-2">
               <Plus className="h-4 w-4" /> New project
             </Button>
           </div>
@@ -448,7 +459,7 @@ export default function ProjectsPage() {
                       projectCount={row.projectCount}
                       collapsed={collapsedPortfolios.has(row.portfolio.id)}
                       onToggle={() => togglePortfolio(row.portfolio.id)}
-                      onNewProject={() => setProjectDialogOpen(true)}
+                      onNewProject={() => openProjectDialog(row.portfolio.id)}
                     />
                   )
                 }
@@ -530,7 +541,11 @@ export default function ProjectsPage() {
         )}
       </div>
 
-      <CreateProjectDialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen} />
+      <CreateProjectDialog
+        open={projectDialogOpen}
+        onOpenChange={handleProjectDialogChange}
+        defaultPortfolioId={createForPortfolioId}
+      />
       <CreatePortfolioDialog open={portfolioDialogOpen} onOpenChange={setPortfolioDialogOpen} />
       <CreateWorkspaceDialog open={workspaceDialogOpen} onOpenChange={setWorkspaceDialogOpen} />
     </div>
