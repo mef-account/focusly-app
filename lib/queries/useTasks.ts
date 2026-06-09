@@ -49,27 +49,31 @@ export function useTasksActiveToday() {
       const today = new Date().toISOString().split('T')[0]
       const todayEnd = `${today}T23:59:59`
 
+      const SELECT = '*, project:projects(id,name,color), assignee:profiles!assignee_id(id,name,avatar_url)'
+
       const [dueRes, scheduledRes] = await Promise.all([
         supabase
           .from('tasks')
-          .select('id, estimate_minutes')
+          .select(SELECT)
           .eq('due_date', today)
-          .not('status', 'in', '("done","cancelled")'),
+          .not('status', 'in', '("done","cancelled")')
+          .order('priority', { ascending: true }),
         supabase
           .from('tasks')
-          .select('id, estimate_minutes')
+          .select(SELECT)
           .gte('scheduled_start', today)
           .lte('scheduled_start', todayEnd)
-          .not('status', 'in', '("done","cancelled")'),
+          .not('status', 'in', '("done","cancelled")')
+          .order('priority', { ascending: true }),
       ])
 
       if (dueRes.error) throw toError(dueRes.error)
       if (scheduledRes.error) throw toError(scheduledRes.error)
 
       // Merge, deduplicate by id
-      const map = new Map<string, { id: string; estimate_minutes: number | null }>()
+      const map = new Map<string, Task>()
       for (const t of [...(dueRes.data ?? []), ...(scheduledRes.data ?? [])]) {
-        map.set(t.id, t)
+        map.set(t.id, t as Task)
       }
       return Array.from(map.values())
     },
@@ -89,7 +93,7 @@ export function useTasksDueThisWeek() {
       const { data, error } = await supabase
         .from('tasks')
         .select('*, project:projects(id,name,color)')
-        .gt('due_date', todayStr)
+        .gte('due_date', todayStr)
         .lte('due_date', in7DaysStr)
         .not('status', 'in', '("done","cancelled")')
         .order('due_date', { ascending: true })

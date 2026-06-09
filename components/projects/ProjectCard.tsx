@@ -45,13 +45,15 @@ export function ProjectCard({ project }: ProjectCardProps) {
           <div className="flex items-center gap-1 shrink-0">
             <span className="text-xs text-muted-foreground tabular-nums">{done}/{total} tasks</span>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-                  onClick={(e) => e.preventDefault()}
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
+              <DropdownMenuTrigger
+                render={
+                  <button
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                    onClick={(e) => e.preventDefault()}
+                  />
+                }
+              >
+                <MoreHorizontal className="h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setEditOpen(true)}>

@@ -3,8 +3,7 @@
 import { CheckSquare, Circle, CheckCircle2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useTasksDueToday } from '@/lib/queries/useTasks'
-import { useUpdateTask } from '@/lib/queries/useTasks'
+import { useTasksDueToday, useUpdateTask } from '@/lib/queries/useTasks'
 import { PRIORITY_CLASSES, PRIORITY_LABELS, cn } from '@/lib/utils'
 import type { Task } from '@/types'
 
@@ -59,7 +58,7 @@ export function TodaysTasksWidget() {
         <h3 className="text-sm font-semibold">Today&apos;s Tasks</h3>
         {tasks && (
           <Badge variant="secondary" className="ml-auto text-xs">
-            {tasks.filter((t) => t.status !== 'done').length} remaining
+            {tasks.filter((t) => t.status !== 'done').length}
           </Badge>
         )}
       </div>

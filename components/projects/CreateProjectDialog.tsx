@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useCreateProject } from '@/lib/queries/useProjects'
-import { useWorkspace } from '@/lib/queries/useWorkspace'
+import { useWorkspaces } from '@/lib/queries/useWorkspace'
 import { usePortfolios } from '@/lib/queries/usePortfolios'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -32,7 +32,7 @@ interface CreateProjectDialogProps {
 }
 
 export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogProps) {
-  const { data: workspace } = useWorkspace()
+  const { data: workspaces = [] } = useWorkspaces()
   const createProject = useCreateProject()
   const { data: portfolios = [] } = usePortfolios()
 
@@ -40,16 +40,25 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   const [description, setDescription] = useState('')
   const [color, setColor] = useState(COLORS[0])
   const [portfolioId, setPortfolioId] = useState<string>('none')
+  const [workspaceId, setWorkspaceId] = useState<string>('none')
+
+  // When workspaces load, default to the first one
+  const effectiveWorkspaceId = workspaceId !== 'none' ? workspaceId : workspaces[0]?.id
+
+  // Filter portfolios to selected workspace
+  const visiblePortfolios = effectiveWorkspaceId
+    ? portfolios.filter((p) => p.workspace_id === effectiveWorkspaceId)
+    : portfolios
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!workspace || !name.trim()) return
+    if (!effectiveWorkspaceId || !name.trim()) return
 
     await createProject.mutateAsync({
       name: name.trim(),
       description: description.trim() || null,
       color,
-      workspace_id: workspace.id,
+      workspace_id: effectiveWorkspaceId,
       portfolio_id: portfolioId === 'none' ? null : portfolioId,
     })
 
@@ -57,6 +66,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     setDescription('')
     setColor(COLORS[0])
     setPortfolioId('none')
+    setWorkspaceId('none')
     onOpenChange(false)
   }
 
@@ -79,7 +89,28 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
             />
           </div>
 
-          {portfolios.length > 0 && (
+          {workspaces.length > 1 && (
+            <div className="space-y-1.5">
+              <Label>Workspace</Label>
+              <Select
+                value={workspaceId !== 'none' ? workspaceId : (workspaces[0]?.id ?? 'none')}
+                onValueChange={(v) => { setWorkspaceId(v); setPortfolioId('none') }}
+              >
+                <SelectTrigger>
+                  <SelectValue>
+                    {workspaces.find((w) => w.id === effectiveWorkspaceId)?.name ?? 'Select workspace'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {workspaces.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {visiblePortfolios.length > 0 && (
             <div className="space-y-1.5">
               <Label>Portfolio</Label>
               <Select value={portfolioId} onValueChange={setPortfolioId}>
@@ -87,12 +118,12 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                   <SelectValue>
                     {portfolioId === 'none'
                       ? 'No portfolio'
-                      : portfolios.find((p) => p.id === portfolioId)?.name ?? 'No portfolio'}
+                      : visiblePortfolios.find((p) => p.id === portfolioId)?.name ?? 'No portfolio'}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No portfolio</SelectItem>
-                  {portfolios.map((p) => (
+                  {visiblePortfolios.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       <span className="flex items-center gap-2">
                         <span className="h-2 w-2 rounded-full inline-block" style={{ backgroundColor: p.color }} />
