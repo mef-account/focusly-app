@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   FolderKanban,
-  CheckSquare,
   CalendarDays,
   FileText,
   TableProperties,
@@ -27,7 +26,6 @@ import { Separator } from '@/components/ui/separator'
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
   { label: 'Structure', href: '/app/projects', icon: FolderKanban },
-  { label: 'My Tasks', href: '/app/my-tasks', icon: CheckSquare },
   { label: 'Planner', href: '/app/planner', icon: CalendarDays },
   { label: 'Notes', href: '/app/notes', icon: FileText },
   { label: 'Views', href: '/app/views', icon: TableProperties },

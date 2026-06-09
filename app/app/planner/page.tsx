@@ -30,6 +30,7 @@ import { TaskTimerButton } from '@/components/tracker/TaskTimerButton'
 import { QuickCreateTaskDialog } from '@/components/planner/QuickCreateTaskDialog'
 import { useTasks, useUpdateTask } from '@/lib/queries/useTasks'
 import { useProjects } from '@/lib/queries/useProjects'
+import { useProfiles } from '@/lib/queries/useProfiles'
 import { useTimeTotalsByTask } from '@/lib/queries/useTimeEntries'
 import { usePlannerStore } from '@/store/usePlannerStore'
 import { useTaskPanelStore } from '@/store/useTaskPanelStore'
@@ -536,6 +537,8 @@ function DayBlock({
 export default function PlannerPage() {
   const { data: tasks = [] } = useTasks()
   const { data: projects = [] } = useProjects()
+  const { data: profiles = [] } = useProfiles()
+  const currentUserId = profiles[0]?.id ?? null
   const updateTask = useUpdateTask()
   const { open: openTaskSheet } = useTaskPanelStore()
   const {
@@ -615,10 +618,11 @@ export default function PlannerPage() {
     return tasks.filter((t) => {
       if (t.due_date) return false
       if (t.status !== 'in_progress') return false
+      if (currentUserId && t.assignee_id !== currentUserId) return false
       if (inboxFilter.projectId && t.project_id !== inboxFilter.projectId) return false
       return true
     })
-  }, [tasks, inboxFilter])
+  }, [tasks, inboxFilter, currentUserId])
 
   const inboxByPriority = useMemo(() => {
     const order = ['urgent', 'high', 'medium', 'low', 'none'] as const
