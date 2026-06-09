@@ -101,6 +101,51 @@ export default function ProjectDetailPage({ params }: PageProps) {
           }}
         />
 
+        {/* Notes — always visible below description */}
+        <div className="border-t pt-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold">Notes</span>
+              {projectNotes.length > 0 && (
+                <span className="text-xs text-muted-foreground">({projectNotes.length})</span>
+              )}
+            </div>
+            <button
+              onClick={handleNewNote}
+              disabled={createNote.isPending}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" /> New note
+            </button>
+          </div>
+
+          {projectNotes.length > 0 && (
+            <div className="space-y-0.5">
+              {projectNotes.map((note, i) => (
+                <div
+                  key={note.id}
+                  onClick={() => openNote(note.id)}
+                  className={`group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent transition-colors ${
+                    i < projectNotes.length - 1 ? '' : ''
+                  }`}
+                >
+                  <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="flex-1 truncate text-sm">{note.title || 'Untitled'}</span>
+                  <span className="text-xs text-muted-foreground">{formatDate(note.updated_at)}</span>
+                  <button
+                    title="Open full screen"
+                    className="text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                    onClick={(e) => { e.stopPropagation(); openNote(note.id, { fullscreen: true }) }}
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Progress bar */}
         <div className="flex items-center gap-3">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
@@ -121,11 +166,6 @@ export default function ProjectDetailPage({ params }: PageProps) {
           <TabsTrigger value="board">Board</TabsTrigger>
           <TabsTrigger value="list">List</TabsTrigger>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
-          <TabsTrigger value="notes">
-            Notes {projectNotes.length > 0 && (
-              <span className="ml-1 text-xs text-muted-foreground">({projectNotes.length})</span>
-            )}
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="board" className="flex-1 overflow-x-auto pt-2">
@@ -152,67 +192,6 @@ export default function ProjectDetailPage({ params }: PageProps) {
           <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed py-20 text-center">
             <p className="font-medium">Timeline view</p>
             <p className="text-sm text-muted-foreground">Coming soon</p>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="notes" className="pt-4">
-          <div className="max-w-2xl space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-semibold">Notes</span>
-                {projectNotes.length > 0 && (
-                  <span className="text-xs text-muted-foreground">({projectNotes.length})</span>
-                )}
-              </div>
-              <button
-                onClick={handleNewNote}
-                disabled={createNote.isPending}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Plus className="h-3.5 w-3.5" /> New note
-              </button>
-            </div>
-
-            {projectNotes.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-12 text-center">
-                <FileText className="h-8 w-8 text-muted-foreground/40" />
-                <div>
-                  <p className="text-sm font-medium">No notes yet</p>
-                  <p className="text-xs text-muted-foreground">Add notes to capture ideas and context for this project</p>
-                </div>
-                <button
-                  onClick={handleNewNote}
-                  disabled={createNote.isPending}
-                  className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors"
-                >
-                  <Plus className="h-3.5 w-3.5" /> New note
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-1 rounded-xl border">
-                {projectNotes.map((note, i) => (
-                  <div
-                    key={note.id}
-                    onClick={() => openNote(note.id)}
-                    className={`group flex cursor-pointer items-center gap-2 px-4 py-3 hover:bg-accent transition-colors ${
-                      i < projectNotes.length - 1 ? 'border-b' : ''
-                    }`}
-                  >
-                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <span className="flex-1 truncate text-sm font-medium">{note.title || 'Untitled'}</span>
-                    <span className="text-xs text-muted-foreground">{formatDate(note.updated_at)}</span>
-                    <button
-                      title="Open full screen"
-                      className="text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
-                      onClick={(e) => { e.stopPropagation(); openNote(note.id, { fullscreen: true }) }}
-                    >
-                      <Maximize2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </TabsContent>
       </Tabs>
