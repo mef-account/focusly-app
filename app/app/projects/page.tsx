@@ -307,10 +307,13 @@ export default function ProjectsPage() {
       })
     : projects
 
-  const projectsByPortfolio = (portfolioId: string) =>
-    activeProjects.filter((p) => p.portfolio_id === portfolioId)
+  const sortByName = (a: Project, b: Project) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
 
-  const unassignedProjects = activeProjects.filter((p) => !p.portfolio_id)
+  const projectsByPortfolio = (portfolioId: string) =>
+    activeProjects.filter((p) => p.portfolio_id === portfolioId).sort(sortByName)
+
+  const unassignedProjects = activeProjects.filter((p) => !p.portfolio_id).sort(sortByName)
 
   const { windowStart, windowEnd, months, timelineWidth } = useMemo(() => {
     const { start, end } = buildGanttWindow(activeProjects)
