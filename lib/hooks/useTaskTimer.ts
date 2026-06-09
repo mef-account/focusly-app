@@ -1,5 +1,6 @@
 'use client'
 
+import { format } from 'date-fns'
 import { useTimerStore } from '@/store/useTimerStore'
 import { useCreateTimeEntry } from '@/lib/queries/useTimeEntries'
 
@@ -30,7 +31,7 @@ export function useTaskTimer() {
       started_at: new Date(s.startedAt).toISOString(),
       stopped_at: new Date().toISOString(),
       duration_seconds: duration,
-      date: new Date(s.startedAt).toISOString().split('T')[0],
+      date: format(new Date(s.startedAt), 'yyyy-MM-dd'),
     })
   }
 

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { format } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { toError } from '@/lib/supabase/errors'
 import type { TimeEntry } from '@/types'
@@ -9,7 +10,7 @@ export function useTimeEntriesToday() {
   return useQuery({
     queryKey: ['time-entries', 'today'],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0]
+      const today = format(new Date(), 'yyyy-MM-dd')
       const { data, error } = await supabase
         .from('time_entries')
         .select('*, project:projects(id,name,color)')

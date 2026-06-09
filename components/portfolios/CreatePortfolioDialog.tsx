@@ -40,10 +40,10 @@ export function CreatePortfolioDialog({ open, onOpenChange }: CreatePortfolioDia
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [color, setColor] = useState(COLORS[0])
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState('')
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
 
   // Default to first workspace once loaded
-  const effectiveWorkspaceId = selectedWorkspaceId || workspaces[0]?.id || ''
+  const effectiveWorkspaceId = selectedWorkspaceId ?? workspaces[0]?.id ?? ''
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
