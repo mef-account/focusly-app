@@ -10,10 +10,19 @@ export function useProjects() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select('*')
+        .select('*, tasks(status)')
         .order('created_at', { ascending: false })
       if (error) throw error
-      return data as Project[]
+
+      return (data ?? []).map((p: any) => {
+        const tasks: { status: string }[] = p.tasks ?? []
+        return {
+          ...p,
+          tasks: undefined,
+          task_count: tasks.length,
+          done_count: tasks.filter((t) => t.status === 'done').length,
+        } as Project
+      })
     },
   })
 }
