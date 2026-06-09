@@ -34,7 +34,7 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
   const [name, setName] = useState(project.name)
   const [description, setDescription] = useState(project.description ?? '')
   const [color, setColor] = useState(project.color)
-  const [portfolioId, setPortfolioId] = useState<string>(project.portfolio_id ?? 'none')
+  const [portfolioId, setPortfolioId] = useState<string | null>(project.portfolio_id ?? 'none')
 
   useEffect(() => {
     if (open) {

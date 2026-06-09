@@ -39,7 +39,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [color, setColor] = useState(COLORS[0])
-  const [portfolioId, setPortfolioId] = useState<string>('none')
+  const [portfolioId, setPortfolioId] = useState<string | null>('none')
   const [workspaceId, setWorkspaceId] = useState<string>('none')
 
   // When workspaces load, default to the first one

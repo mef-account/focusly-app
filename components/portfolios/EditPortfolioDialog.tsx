@@ -34,7 +34,7 @@ export function EditPortfolioDialog({ portfolio, open, onOpenChange }: EditPortf
   const [name, setName] = useState(portfolio.name)
   const [description, setDescription] = useState(portfolio.description ?? '')
   const [color, setColor] = useState(portfolio.color)
-  const [workspaceId, setWorkspaceId] = useState(portfolio.workspace_id)
+  const [workspaceId, setWorkspaceId] = useState<string | null>(portfolio.workspace_id)
 
   useEffect(() => {
     if (open) {
