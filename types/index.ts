@@ -67,6 +67,8 @@ export interface Project {
   // joined / computed
   task_count?: number
   done_count?: number
+  min_due_date?: string | null
+  max_due_date?: string | null
 }
 
 // ─── Label ────────────────────────────────────────────────────────────────────

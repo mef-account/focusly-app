@@ -10,17 +10,20 @@ export function useProjects() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select('*, tasks(status)')
+        .select('*, tasks(status, due_date)')
         .order('created_at', { ascending: false })
       if (error) throw error
 
       return (data ?? []).map((p: any) => {
-        const tasks: { status: string }[] = p.tasks ?? []
+        const tasks: { status: string; due_date: string | null }[] = p.tasks ?? []
+        const dueDates = tasks.map((t) => t.due_date).filter(Boolean).sort() as string[]
         return {
           ...p,
           tasks: undefined,
           task_count: tasks.length,
           done_count: tasks.filter((t) => t.status === 'done').length,
+          min_due_date: dueDates[0] ?? null,
+          max_due_date: dueDates.at(-1) ?? null,
         } as Project
       })
     },
