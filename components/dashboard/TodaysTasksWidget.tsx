@@ -15,7 +15,7 @@ function TaskRow({ task }: { task: Task }) {
   const dueLabel = task.due_date ? taskDueDateLabel(task.due_date) : null
 
   return (
-    <div className="flex items-center gap-2 py-2">
+    <div className="flex items-center gap-2 py-1">
       <span className="min-w-0 flex-1 truncate text-sm">{task.title}</span>
       <span className="shrink-0 text-xs text-muted-foreground">
         {formatMinutes(task.estimate_minutes ?? DEFAULT_DUR)}
@@ -62,7 +62,7 @@ export function TodaysTasksWidget() {
           Nothing due today 🎉
         </p>
       ) : (
-        <div className="flex-1 overflow-y-auto divide-y divide-border">
+        <div className="flex-1 overflow-y-auto space-y-1">
           {sortedTasks.map((task) => (
             <TaskRow key={task.id} task={task} />
           ))}
