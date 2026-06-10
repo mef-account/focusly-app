@@ -833,7 +833,7 @@ function ColHeader({ label, col, width, onResize }: {
   return (
     <th
       style={{ width }}
-      className="group/th relative h-8 px-2 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground overflow-hidden"
+      className="group/th relative h-8 px-2 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground overflow-hidden"
     >
       <span className="truncate">{label}</span>
       <div
