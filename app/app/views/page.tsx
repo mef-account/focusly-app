@@ -186,11 +186,11 @@ function viewFiltersToActive(vf: { field: string; operator: string; value: unkno
 
 // ─── Column resize ────────────────────────────────────────────────────────────
 
-const COL_PERSIST_KEY = 'focusly:views-col-widths-v4'
+const COL_PERSIST_KEY = 'focusly:views-col-widths-v5'
 
 const DEFAULT_COL_WIDTHS: Record<string, number> = {
   title:            380,
-  status:            28,
+  status:            24,
   priority:         110,
   assignee:          60,
   project:          160,
@@ -941,7 +941,7 @@ function TaskRow({
       )}
 
       {/* Title */}
-      <td style={{ width: colW['title'] }} className="h-7 pl-8 pr-3">
+      <td style={{ width: colW['title'] }} className="h-7 px-2">
         <span className="truncate block text-[13px]">{task.title}</span>
       </td>
 
