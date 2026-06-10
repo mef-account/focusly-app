@@ -123,6 +123,7 @@ export default function NotesPage() {
           {/* Note top bar */}
           <div className="flex items-center gap-2 border-b px-4 py-2">
             <Input
+              spellCheck
               className="h-8 border-0 bg-transparent p-0 text-base font-semibold shadow-none focus-visible:ring-0 flex-1"
               value={title}
               onChange={(e) => setTitle(e.target.value)}

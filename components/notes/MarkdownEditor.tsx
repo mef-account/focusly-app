@@ -188,6 +188,7 @@ export function MarkdownEditor({ value, onChange, className, defaultMode = 'spli
         {(mode === 'edit' || mode === 'split') && (
           <textarea
             ref={textareaRef}
+            spellCheck
             className={cn(
               'flex-1 resize-none bg-background p-4 font-mono text-sm outline-none placeholder:text-muted-foreground',
               mode === 'split' && 'border-r'

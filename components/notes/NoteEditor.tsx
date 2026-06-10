@@ -99,6 +99,7 @@ export function NoteEditor({ noteId, defaultMode = 'split', actions, onDeleted, 
       {/* Header */}
       <div className="flex items-center gap-2 border-b px-4 py-2">
         <input
+          spellCheck
           className="h-8 flex-1 bg-transparent text-base font-semibold outline-none placeholder:text-muted-foreground"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
