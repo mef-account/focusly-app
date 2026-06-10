@@ -575,43 +575,23 @@ function ViewsPageInner() {
         </div>
       </div>
 
-      {/* ── View tabs ── */}
-      <div className="flex items-center gap-1 border-b px-6 py-1.5">
-        <Link
-          href="/app/views"
-          className={cn(
-            'rounded-md px-3 py-1 text-sm font-medium transition-colors',
-          !viewId ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50'
-            )}
-          >
-            Backlog
-          </Link>
-        {sortedViews.map((v) => (
-          <Link
-            key={v.id}
-            href={`/app/views?view=${v.id}`}
-            className={cn(
-              'rounded-md px-3 py-1 text-sm font-medium transition-colors',
-              viewId === v.id ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50'
-            )}
-          >
-            {v.name}
-          </Link>
-        ))}
-      </div>
+      {/* ── Main area: task list + right panel ── */}
+      <div className="flex flex-1 overflow-hidden">
 
-      {/* ── Search bar ── */}
-      <div className="border-b px-6 py-2">
-        <Input
-          placeholder="Search tasks…"
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          className="h-7 max-w-xs text-xs"
-        />
-      </div>
+        {/* Left: search + table */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Search bar */}
+          <div className="border-b px-6 py-2">
+            <Input
+              placeholder="Search tasks…"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="h-7 max-w-xs text-xs"
+            />
+          </div>
 
-      {/* ── Task list ── */}
-      <div className="flex-1 overflow-auto">
+          {/* Task list */}
+          <div className="flex-1 overflow-auto">
         {filteredTasks.length === 0 && !isLoading ? (
           <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
             No tasks match your filters
@@ -791,7 +771,59 @@ function ViewsPageInner() {
             </tbody>
           </table>
         )}
-      </div>
+          </div>
+        </div>{/* end left column */}
+
+        {/* ── Right panel: saved views ── */}
+        <div className="w-48 shrink-0 border-l flex flex-col overflow-y-auto">
+          <div className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Views
+          </div>
+
+          {/* Backlog (default) */}
+          <button
+            onClick={() => {
+              if (viewId) {
+                router.push('/app/views')
+              } else {
+                setFilters(DEFAULT_FILTERS)
+                setDisplay(DEFAULT_DISPLAY)
+                setSearchText('')
+                setIsDirty(false)
+              }
+            }}
+            className={cn(
+              'w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-accent/50',
+              !viewId ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground'
+            )}
+          >
+            Backlog
+          </button>
+
+          {/* Saved views */}
+          {sortedViews.map((v) => (
+            <Link
+              key={v.id}
+              href={`/app/views?view=${v.id}`}
+              className={cn(
+                'w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-accent/50 truncate',
+                viewId === v.id ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground'
+              )}
+            >
+              {v.name}
+            </Link>
+          ))}
+
+          {/* New saved view */}
+          <button
+            onClick={() => { setSaveName(''); setSaveDialogOpen(true) }}
+            className="mt-auto border-t px-3 py-2 text-left text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            + Save current view
+          </button>
+        </div>
+
+      </div>{/* end main area flex row */}
 
       {/* ── Save View dialog ── */}
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
