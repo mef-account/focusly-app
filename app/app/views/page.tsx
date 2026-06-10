@@ -664,7 +664,7 @@ function ViewsPageInner() {
                     >
                       <td style={{ width: 24 }} className="h-7" />
                       {showCol('status') && <td style={{ width: colW['status'] }} />}
-                      <td style={{ width: colW['title'] }} className="h-7 px-4">
+                      <td style={{ width: colW['title'] }} className="h-7 px-2">
                         <span className={cn('flex items-center gap-2 text-sm font-semibold text-foreground', indent && 'pl-4')}>
                           {isCollapsed ? (
                             <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
@@ -736,6 +736,7 @@ function ViewsPageInner() {
                                   showCreatedAt={showCol('created_at')}
                                   showEstimate={showCol('estimate_minutes')}
                                   showLogged={showCol('logged')}
+                                  indent={2}
                                   onOpen={() => openTask(task.id)}
                                   onUpdateTask={(updates) => updateTask.mutate({ id: task.id, ...updates })}
                                 />
@@ -760,6 +761,7 @@ function ViewsPageInner() {
                             showCreatedAt={showCol('created_at')}
                             showEstimate={showCol('estimate_minutes')}
                             showLogged={showCol('logged')}
+                            indent={display.groupBy !== 'none' ? 1 : 0}
                             onOpen={() => openTask(task.id)}
                             onUpdateTask={(updates) => updateTask.mutate({ id: task.id, ...updates })}
                           />
@@ -901,6 +903,7 @@ interface TaskRowProps {
   showCreatedAt: boolean
   showEstimate: boolean
   showLogged: boolean
+  indent?: 0 | 1 | 2
   onOpen: () => void
   onUpdateTask: (updates: Partial<Task>) => void
 }
@@ -928,6 +931,7 @@ function TaskRow({
   showCreatedAt,
   showEstimate,
   showLogged,
+  indent = 0,
   onOpen,
   onUpdateTask,
 }: TaskRowProps) {
@@ -974,7 +978,12 @@ function TaskRow({
       )}
 
       {/* Title */}
-      <td style={{ width: colW['title'] }} className="h-7 px-2">
+      <td style={{ width: colW['title'] }} className={cn(
+        'h-7 pr-2',
+        indent === 0 && 'pl-2',
+        indent === 1 && 'pl-5',
+        indent === 2 && 'pl-9',
+      )}>
         <span className="truncate block text-[13px]">{task.title}</span>
       </td>
 
