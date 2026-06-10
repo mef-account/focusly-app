@@ -1,10 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Check, ChevronDown, Clock, FolderKanban } from 'lucide-react'
+import { Check, ChevronDown, Clock, FolderKanban, CalendarIcon, X } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +45,8 @@ export function QuickCreateTaskDialog() {
   const [assigneeId, setAssigneeId] = useState<string | null>(null)
   const [projectId, setProjectId] = useState<string | null>(null)
   const [estimateInput, setEstimateInput] = useState('')
+  const [dueDate, setDueDate] = useState<string | null>(null)
+  const [dueDateOpen, setDueDateOpen] = useState(false)
   const [createMore, setCreateMore] = useState(false)
 
   const titleRef = useRef<HTMLInputElement>(null)
@@ -60,6 +65,7 @@ export function QuickCreateTaskDialog() {
     setPriority('none')
     setAssigneeId(null)
     setEstimateInput('')
+    setDueDate(null)
     setProjectId(null)
   }
 
@@ -77,7 +83,7 @@ export function QuickCreateTaskDialog() {
       parent_task_id: null,
       created_by: null,
       start_date: null,
-      due_date: null,
+      due_date: dueDate,
       scheduled_start: null,
     })
     if (createMore) {
@@ -224,6 +230,41 @@ export function QuickCreateTaskDialog() {
               <span className="text-[10px] text-muted-foreground">{formatMinutes(estimateMinutes)}</span>
             )}
           </div>
+
+          {/* Due date */}
+          <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
+            <PopoverTrigger
+              render={
+                <button className="flex items-center gap-1 rounded-md border border-input px-1.5 py-0.5 text-xs hover:bg-accent transition-colors" />
+              }
+            >
+              <CalendarIcon className="h-3 w-3 text-muted-foreground" />
+              <span className={cn(dueDate ? 'text-foreground' : 'text-muted-foreground')}>
+                {dueDate ? format(parseISO(dueDate), 'MMM d') : 'Due date'}
+              </span>
+              {dueDate && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={(e) => { e.stopPropagation(); setDueDate(null) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setDueDate(null) } }}
+                >
+                  <X className="h-3 w-3" />
+                </span>
+              )}
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={dueDate ? parseISO(dueDate) : undefined}
+                onSelect={(d) => {
+                  setDueDate(d ? format(d, 'yyyy-MM-dd') : null)
+                  setDueDateOpen(false)
+                }}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
 
         <Separator />
