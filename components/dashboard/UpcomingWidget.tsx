@@ -4,15 +4,7 @@ import { CalendarClock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useTasksDueThisWeek } from '@/lib/queries/useTasks'
-import { formatDate, cn } from '@/lib/utils'
-import { isToday, isTomorrow, parseISO } from 'date-fns'
-
-function dueDateLabel(dateStr: string): { label: string; urgent: boolean } {
-  const d = parseISO(dateStr)
-  if (isToday(d)) return { label: 'Today', urgent: true }
-  if (isTomorrow(d)) return { label: 'Tomorrow', urgent: false }
-  return { label: formatDate(dateStr), urgent: false }
-}
+import { taskDueDateLabel, cn } from '@/lib/utils'
 
 export function UpcomingWidget() {
   const { data: tasks, isLoading } = useTasksDueThisWeek()
@@ -42,7 +34,7 @@ export function UpcomingWidget() {
       ) : (
         <div className="space-y-1">
           {tasks.slice(0, 8).map((task) => {
-            const { label, urgent } = dueDateLabel(task.due_date!)
+            const { label, urgent } = taskDueDateLabel(task.due_date!)
             return (
               <div key={task.id} className="flex items-center justify-between gap-2 py-1">
                 <div className="flex items-center gap-2 min-w-0">

@@ -7,6 +7,7 @@ import {
   isThisWeek,
   startOfToday,
   format,
+  parseISO,
 } from 'date-fns'
 import type { DueDateBucket, TaskStatus, TaskPriority } from '@/types'
 
@@ -90,6 +91,22 @@ export function formatDate(date: string | Date | null): string {
   if (!date) return '—'
   const d = typeof date === 'string' ? new Date(date) : date
   return format(d, 'dd/MM/yyyy')
+}
+
+export function taskDueDateLabel(dateStr: string): { label: string; urgent: boolean } {
+  const d = parseISO(dateStr)
+  if (isToday(d)) return { label: 'Today', urgent: true }
+  if (isBefore(d, startOfToday())) return { label: formatDate(dateStr), urgent: true }
+  if (isTomorrow(d)) return { label: 'Tomorrow', urgent: false }
+  return { label: formatDate(dateStr), urgent: false }
+}
+
+export const PRIORITY_ORDER: TaskPriority[] = ['urgent', 'high', 'medium', 'low', 'none']
+
+export function sortTasksByPriority<T extends { priority: TaskPriority }>(tasks: T[]): T[] {
+  return [...tasks].sort(
+    (a, b) => PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority)
+  )
 }
 
 // ─── Initials fallback for avatars ────────────────────────────────────────────

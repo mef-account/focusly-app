@@ -1,20 +1,23 @@
 'use client'
 
+import { useMemo } from 'react'
 import { CheckSquare, Circle, CheckCircle2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PriorityIcon } from '@/components/tasks/PriorityIcon'
 import { useTasksDueToday, useUpdateTask } from '@/lib/queries/useTasks'
-import { PRIORITY_CLASSES, PRIORITY_LABELS, cn } from '@/lib/utils'
+import { taskDueDateLabel, sortTasksByPriority, cn } from '@/lib/utils'
 import type { Task } from '@/types'
 
 function TaskRow({ task }: { task: Task }) {
   const update = useUpdateTask()
   const isDone = task.status === 'done'
+  const dueLabel = task.due_date ? taskDueDateLabel(task.due_date) : null
 
   return (
-    <div className="flex items-start gap-3 py-2">
+    <div className="flex items-center gap-2 py-2">
       <button
-        className="mt-0.5 shrink-0 text-muted-foreground hover:text-primary transition-colors"
+        className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
         onClick={() =>
           update.mutate({ id: task.id, status: isDone ? 'todo' : 'done' })
         }
@@ -25,31 +28,34 @@ function TaskRow({ task }: { task: Task }) {
           <Circle className="h-4 w-4" />
         )}
       </button>
-      <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
-        <span className={cn('truncate text-sm', isDone && 'line-through text-muted-foreground')}>
-          {task.title}
-        </span>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {task.project && (
-            <span
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{ backgroundColor: task.project.color }}
-            />
+
+      <PriorityIcon priority={task.priority} />
+
+      <span className={cn('min-w-0 flex-1 truncate text-sm', isDone && 'line-through text-muted-foreground')}>
+        {task.title}
+      </span>
+
+      {dueLabel && (
+        <span
+          className={cn(
+            'shrink-0 text-xs font-medium',
+            dueLabel.urgent ? 'text-amber-600' : 'text-muted-foreground'
           )}
-          <Badge
-            variant="secondary"
-            className={cn('text-[10px] px-1.5 py-0', PRIORITY_CLASSES[task.priority])}
-          >
-            {PRIORITY_LABELS[task.priority]}
-          </Badge>
-        </div>
-      </div>
+        >
+          {dueLabel.label}
+        </span>
+      )}
     </div>
   )
 }
 
 export function TodaysTasksWidget() {
   const { data: tasks, isLoading } = useTasksDueToday()
+
+  const sortedTasks = useMemo(
+    () => (tasks ? sortTasksByPriority(tasks) : []),
+    [tasks]
+  )
 
   return (
     <div className="rounded-xl border bg-card p-5">
@@ -69,13 +75,13 @@ export function TodaysTasksWidget() {
             <Skeleton key={i} className="h-8 w-full" />
           ))}
         </div>
-      ) : !tasks?.length ? (
+      ) : !sortedTasks.length ? (
         <p className="py-4 text-center text-sm text-muted-foreground">
           Nothing due today 🎉
         </p>
       ) : (
         <div className="divide-y divide-border">
-          {tasks.map((task) => (
+          {sortedTasks.map((task) => (
             <TaskRow key={task.id} task={task} />
           ))}
         </div>
