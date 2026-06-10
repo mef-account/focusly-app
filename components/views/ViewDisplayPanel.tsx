@@ -29,6 +29,7 @@ export type ColumnId = (typeof ALL_COLUMNS)[number]['id']
 
 export interface DisplayOptions {
   groupBy: ViewGroupBy
+  subGroupBy: ViewGroupBy
   sortField: SortField
   sortDir: SortDir
   visibleColumns: ColumnId[]
@@ -46,6 +47,8 @@ const GROUP_BY_OPTIONS: { value: ViewGroupBy; label: string }[] = [
   { value: 'project', label: 'Project' },
   { value: 'assignee', label: 'Assignee' },
   { value: 'due_date', label: 'Due date' },
+  { value: 'portfolio', label: 'Portfolio' },
+  { value: 'workspace', label: 'Workspace' },
 ]
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
@@ -60,6 +63,10 @@ export function ViewDisplayPanel({ options, onChange }: ViewDisplayPanelProps) {
 
   function setGroupBy(v: ViewGroupBy) {
     onChange({ ...options, groupBy: v })
+  }
+
+  function setSubGroupBy(v: ViewGroupBy) {
+    onChange({ ...options, subGroupBy: v })
   }
 
   function setSortField(v: SortField) {
@@ -87,7 +94,7 @@ export function ViewDisplayPanel({ options, onChange }: ViewDisplayPanelProps) {
         <SlidersHorizontal className="h-3.5 w-3.5" />
         Display
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-64 p-0" sideOffset={6}>
+      <PopoverContent align="end" className="w-72 p-0" sideOffset={6}>
         {/* Grouping */}
         <div className="px-3 py-2">
           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -101,6 +108,31 @@ export function ViewDisplayPanel({ options, onChange }: ViewDisplayPanelProps) {
                 className={cn(
                   'rounded-full border px-2.5 py-0.5 text-xs transition-colors hover:border-primary hover:text-primary',
                   options.groupBy === g.value
+                    ? 'border-primary bg-primary/10 text-primary font-medium'
+                    : 'border-border text-muted-foreground'
+                )}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Sub Grouping */}
+        <div className="px-3 py-2">
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Sub Grouping
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {GROUP_BY_OPTIONS.map((g) => (
+              <button
+                key={g.value}
+                onClick={() => setSubGroupBy(g.value)}
+                className={cn(
+                  'rounded-full border px-2.5 py-0.5 text-xs transition-colors hover:border-primary hover:text-primary',
+                  options.subGroupBy === g.value
                     ? 'border-primary bg-primary/10 text-primary font-medium'
                     : 'border-border text-muted-foreground'
                 )}

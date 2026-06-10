@@ -19,6 +19,7 @@ import { useTimeTotalsByTask } from '@/lib/queries/useTimeEntries'
 import { useProjects } from '@/lib/queries/useProjects'
 import { useProfiles } from '@/lib/queries/useProfiles'
 import { useWorkspaces } from '@/lib/queries/useWorkspace'
+import { usePortfolios } from '@/lib/queries/usePortfolios'
 import { useViews, useCreateView, useUpdateView, useDeleteView } from '@/lib/queries/useViews'
 import { useTaskPanelStore } from '@/store/useTaskPanelStore'
 import { createClient } from '@/lib/supabase/client'
@@ -51,6 +52,7 @@ import type { Task, TaskStatus, TaskPriority, ViewGroupBy } from '@/types'
 
 const DEFAULT_DISPLAY: DisplayOptions = {
   groupBy: 'none',
+  subGroupBy: 'none',
   sortField: 'created_at',
   sortDir: 'asc',
   visibleColumns: ['status', 'assignee', 'priority', 'project', 'due_date', 'created_at'],
@@ -61,6 +63,8 @@ const DEFAULT_FILTERS: ActiveFilters = {
   priorities: [],
   projectIds: [],
   assigneeIds: [],
+  portfolioIds: [],
+  workspaceIds: [],
 }
 
 // ─── Grouping helpers ─────────────────────────────────────────────────────────
@@ -78,6 +82,12 @@ function getGroupKey(task: Task, groupBy: ViewGroupBy): string {
       return task.project_id ? (task.project?.name ?? task.project_id) : '— No project'
     case 'assignee':
       return task.assignee_id ? (task.assignee?.name ?? task.assignee_id) : '— Unassigned'
+    case 'portfolio':
+      return task.project?.portfolio_id
+        ? (task.project.portfolio_id)
+        : '— No portfolio'
+    case 'workspace':
+      return task.project?.workspace_id ?? '— No workspace'
     case 'due_date': {
       if (!task.due_date) return '— No due date'
       const d = new Date(task.due_date + 'T00:00:00')
@@ -155,17 +165,21 @@ function filtersToViewFilters(f: ActiveFilters) {
   if (f.priorities.length) out.push({ field: 'priority', operator: 'is', value: f.priorities })
   if (f.projectIds.length) out.push({ field: 'project_id', operator: 'is', value: f.projectIds })
   if (f.assigneeIds.length) out.push({ field: 'assignee_id', operator: 'is', value: f.assigneeIds })
+  if (f.portfolioIds.length) out.push({ field: 'portfolio_id', operator: 'is', value: f.portfolioIds })
+  if (f.workspaceIds.length) out.push({ field: 'workspace_id', operator: 'is', value: f.workspaceIds })
   return out
 }
 
 function viewFiltersToActive(vf: { field: string; operator: string; value: unknown }[]): ActiveFilters {
-  const result: ActiveFilters = { statuses: [], priorities: [], projectIds: [], assigneeIds: [] }
+  const result: ActiveFilters = { statuses: [], priorities: [], projectIds: [], assigneeIds: [], portfolioIds: [], workspaceIds: [] }
   for (const f of vf) {
     const v = Array.isArray(f.value) ? f.value : [f.value].filter(Boolean)
     if (f.field === 'status') result.statuses = v as TaskStatus[]
     if (f.field === 'priority') result.priorities = v as TaskPriority[]
     if (f.field === 'project_id') result.projectIds = v as string[]
     if (f.field === 'assignee_id') result.assigneeIds = v as string[]
+    if (f.field === 'portfolio_id') result.portfolioIds = v as string[]
+    if (f.field === 'workspace_id') result.workspaceIds = v as string[]
   }
   return result
 }
@@ -238,6 +252,7 @@ function ViewsPageInner() {
   const { data: projects = [] } = useProjects()
   const { data: profiles = [] } = useProfiles()
   const { data: workspaces = [] } = useWorkspaces()
+  const { data: portfolios = [] } = usePortfolios()
   const workspace = workspaces[0]
   const { data: savedViews = [] } = useViews()
   const { data: timeTotals = {} } = useTimeTotalsByTask(tasks.map((t) => t.id))
@@ -268,6 +283,7 @@ function ViewsPageInner() {
       setFilters(viewFiltersToActive(activeView.filters as { field: string; operator: string; value: unknown }[]))
       setDisplay({
         groupBy: activeView.group_by ?? 'status',
+        subGroupBy: 'none',
         sortField: (activeView.sort?.column as DisplayOptions['sortField']) ?? 'priority',
         sortDir: (activeView.sort?.direction as 'asc' | 'desc') ?? 'asc',
         visibleColumns: (activeView.visible_columns ?? DEFAULT_DISPLAY.visibleColumns) as ColumnId[],
@@ -314,14 +330,59 @@ function ViewsPageInner() {
     }
     if (filters.assigneeIds.length)
       result = result.filter((t) => t.assignee_id != null && filters.assigneeIds.includes(t.assignee_id))
+    if (filters.portfolioIds.length)
+      result = result.filter((t) => t.project?.portfolio_id != null && filters.portfolioIds.includes(t.project.portfolio_id))
+    if (filters.workspaceIds.length)
+      result = result.filter((t) => t.project?.workspace_id != null && filters.workspaceIds.includes(t.project.workspace_id))
 
     return sortTasks(result, display.sortField, display.sortDir)
   }, [tasks, filters, display.sortField, display.sortDir, searchText])
 
   // ── Grouping ───────────────────────────────────────────────────────────────
 
+  // Resolve portfolio/workspace names for group labels
+  const portfolioNameById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const p of portfolios) m.set(p.id, p.name)
+    return m
+  }, [portfolios])
+
+  const workspaceNameById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const w of workspaces) m.set(w.id, w.name)
+    return m
+  }, [workspaces])
+
+  function resolveGroupLabel(key: string, groupBy: ViewGroupBy): string {
+    if (groupBy === 'portfolio' && key !== '— No portfolio') return portfolioNameById.get(key) ?? key
+    if (groupBy === 'workspace' && key !== '— No workspace') return workspaceNameById.get(key) ?? key
+    return getGroupLabel(key, groupBy)
+  }
+
   const groups = useMemo(() => {
-    if (display.groupBy === 'none') return [{ key: 'all', label: 'All tasks', tasks: filteredTasks }]
+    if (display.groupBy === 'none') {
+      if (display.subGroupBy === 'none') {
+        return [{ key: 'all', label: 'All tasks', tasks: filteredTasks, subGroups: null as null | { key: string; label: string; tasks: Task[] }[] }]
+      }
+      // Sub-group within the single "all" group
+      const subMap = new Map<string, Task[]>()
+      for (const task of filteredTasks) {
+        const sk = getGroupKey(task, display.subGroupBy)
+        if (!subMap.has(sk)) subMap.set(sk, [])
+        subMap.get(sk)!.push(task)
+      }
+      const sortedSubKeys = sortGroups(Array.from(subMap.keys()), display.subGroupBy)
+      return [{
+        key: 'all',
+        label: 'All tasks',
+        tasks: filteredTasks,
+        subGroups: sortedSubKeys.map((sk) => ({
+          key: sk,
+          label: resolveGroupLabel(sk, display.subGroupBy),
+          tasks: subMap.get(sk)!,
+        })),
+      }]
+    }
 
     const map = new Map<string, Task[]>()
     for (const task of filteredTasks) {
@@ -330,12 +391,31 @@ function ViewsPageInner() {
       map.get(key)!.push(task)
     }
     const sortedKeys = sortGroups(Array.from(map.keys()), display.groupBy)
-    return sortedKeys.map((key) => ({
-      key,
-      label: getGroupLabel(key, display.groupBy),
-      tasks: map.get(key)!,
-    }))
-  }, [filteredTasks, display.groupBy])
+    return sortedKeys.map((key) => {
+      const groupTasks = map.get(key)!
+      let subGroups: { key: string; label: string; tasks: Task[] }[] | null = null
+      if (display.subGroupBy !== 'none') {
+        const subMap = new Map<string, Task[]>()
+        for (const task of groupTasks) {
+          const sk = getGroupKey(task, display.subGroupBy)
+          if (!subMap.has(sk)) subMap.set(sk, [])
+          subMap.get(sk)!.push(task)
+        }
+        const sortedSubKeys = sortGroups(Array.from(subMap.keys()), display.subGroupBy)
+        subGroups = sortedSubKeys.map((sk) => ({
+          key: sk,
+          label: resolveGroupLabel(sk, display.subGroupBy),
+          tasks: subMap.get(sk)!,
+        }))
+      }
+      return {
+        key,
+        label: resolveGroupLabel(key, display.groupBy),
+        tasks: groupTasks,
+        subGroups,
+      }
+    })
+  }, [filteredTasks, display.groupBy, display.subGroupBy, portfolioNameById, workspaceNameById]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Save ───────────────────────────────────────────────────────────────────
 
@@ -488,6 +568,8 @@ function ViewsPageInner() {
             onChange={handleFiltersChange}
             projects={projects}
             profiles={profiles}
+            portfolios={portfolios}
+            workspaces={workspaces}
           />
           <ViewDisplayPanel options={display} onChange={handleDisplayChange} />
         </div>
@@ -578,85 +660,131 @@ function ViewsPageInner() {
                     return next
                   })
 
-                // Aggregate: latest due_date in this group
                 const dueDates = group.tasks.map((t) => t.due_date).filter(Boolean) as string[]
                 const maxDue = dueDates.length ? dueDates.sort().reverse()[0] : null
-
-                // Totals for group header
                 const totalEstMins = group.tasks.reduce((s, t) => s + (t.estimate_minutes ?? 0), 0)
                 const totalLogSecs = group.tasks.reduce((s, t) => s + (timeTotals[t.id] ?? 0), 0)
+
+                const renderGroupHeader = (key: string, label: string, groupBy: ViewGroupBy, indent = false) => {
+                  const isCollapsed = collapsedGroups.has(key)
+                  const toggleKey = () => setCollapsedGroups((prev) => {
+                    const next = new Set(prev)
+                    next.has(key) ? next.delete(key) : next.add(key)
+                    return next
+                  })
+                  return (
+                    <tr
+                      key={`hdr-${key}`}
+                      className={cn(
+                        'cursor-pointer select-none border-y border-border/60',
+                        indent ? 'bg-muted/30' : 'bg-muted/60'
+                      )}
+                      onClick={toggleKey}
+                    >
+                      <td style={{ width: 36 }} className="h-7" />
+                      {showCol('status') && <td style={{ width: colW['status'] }} />}
+                      <td style={{ width: colW['title'] }} className="h-7 px-4">
+                        <span className={cn('flex items-center gap-2 text-sm font-semibold text-foreground', indent && 'pl-4')}>
+                          {isCollapsed ? (
+                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                          )}
+                          <GroupIcon groupKey={key} groupBy={groupBy} />
+                          {label}
+                          {!indent && (
+                            <>
+                              <span className="text-xs font-normal text-muted-foreground">
+                                {group.tasks.length}
+                              </span>
+                              {totalEstMins > 0 && (
+                                <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                                  · <Clock className="h-3 w-3" /> Est {formatMinutes(totalEstMins)}
+                                </span>
+                              )}
+                              {totalLogSecs > 0 && (
+                                <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                                  · <Clock className="h-3 w-3" /> Log {formatDuration(totalLogSecs)}
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </span>
+                      </td>
+                      {showCol('priority') && <td style={{ width: colW['priority'] }} />}
+                      {showCol('assignee') && <td style={{ width: colW['assignee'] }} />}
+                      {showCol('project') && <td style={{ width: colW['project'] }} />}
+                      {showCol('due_date') && (
+                        <td style={{ width: colW['due_date'] }} className="h-7 px-2 text-xs text-muted-foreground tabular-nums">
+                          {!indent && maxDue ? formatDate(maxDue) : ''}
+                        </td>
+                      )}
+                      {showCol('created_at') && <td style={{ width: colW['created_at'] }} />}
+                      {showCol('estimate_minutes') && <td style={{ width: colW['estimate_minutes'] }} />}
+                      {showCol('logged') && <td style={{ width: colW['logged'] }} />}
+                      <td style={{ width: 44 }} />
+                    </tr>
+                  )
+                }
 
                 return (
                   <React.Fragment key={group.key}>
                     {/* Group header row */}
-                    {display.groupBy !== 'none' && (
-                      <tr
-                        key={`hdr-${group.key}`}
-                        className="cursor-pointer select-none bg-muted/60 border-y border-border/60"
-                        onClick={toggle}
-                      >
-                        <td style={{ width: 36 }} className="h-7" />
-                        {showCol('status') && <td style={{ width: colW['status'] }} />}
-                        <td style={{ width: colW['title'] }} className="h-7 px-4">
-                          <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                            {collapsed ? (
-                              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                            ) : (
-                              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                            )}
-                            <GroupIcon groupKey={group.key} groupBy={display.groupBy} />
-                            {group.label}
-                            <span className="text-xs font-normal text-muted-foreground">
-                              {group.tasks.length}
-                            </span>
-                            {totalEstMins > 0 && (
-                              <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
-                                · <Clock className="h-3 w-3" /> Est {formatMinutes(totalEstMins)}
-                              </span>
-                            )}
-                            {totalLogSecs > 0 && (
-                              <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
-                                · <Clock className="h-3 w-3" /> Log {formatDuration(totalLogSecs)}
-                              </span>
-                            )}
-                          </span>
-                        </td>
-                        {showCol('priority') && <td style={{ width: colW['priority'] }} />}
-                        {showCol('assignee') && <td style={{ width: colW['assignee'] }} />}
-                        {showCol('project') && <td style={{ width: colW['project'] }} />}
-                        {showCol('due_date') && (
-                          <td style={{ width: colW['due_date'] }} className="h-7 px-2 text-xs text-muted-foreground tabular-nums">
-                            {maxDue ? formatDate(maxDue) : ''}
-                          </td>
-                        )}
-                        {showCol('created_at') && <td style={{ width: colW['created_at'] }} />}
-                        {showCol('estimate_minutes') && <td style={{ width: colW['estimate_minutes'] }} />}
-                        {showCol('logged') && <td style={{ width: colW['logged'] }} />}
-                        <td style={{ width: 44 }} />
-                      </tr>
-                    )}
+                    {display.groupBy !== 'none' && renderGroupHeader(group.key, group.label, display.groupBy)}
 
-                    {/* Task rows */}
-                    {!collapsed &&
-                      group.tasks.map((task, idx) => (
-                        <TaskRow
-                          key={task.id}
-                          task={task}
-                          rowNum={idx + 1}
-                          timeTotals={timeTotals}
-                          colW={colW}
-                          showStatus={showCol('status')}
-                          showPriority={showCol('priority')}
-                          showAssignee={showCol('assignee')}
-                          showProject={showCol('project')}
-                          showDue={showCol('due_date')}
-                          showCreatedAt={showCol('created_at')}
-                          showEstimate={showCol('estimate_minutes')}
-                          showLogged={showCol('logged')}
-                          onOpen={() => openTask(task.id)}
-                          onUpdateTask={(updates) => updateTask.mutate({ id: task.id, ...updates })}
-                        />
-                      ))}
+                    {!collapsed && (
+                      group.subGroups ? (
+                        // Sub-groups
+                        group.subGroups.map((sub) => {
+                          const subCollapsed = collapsedGroups.has(`sub-${sub.key}`)
+                          return (
+                            <React.Fragment key={`sub-${sub.key}`}>
+                              {renderGroupHeader(`sub-${sub.key}`, sub.label, display.subGroupBy, true)}
+                              {!subCollapsed && sub.tasks.map((task, idx) => (
+                                <TaskRow
+                                  key={task.id}
+                                  task={task}
+                                  rowNum={idx + 1}
+                                  timeTotals={timeTotals}
+                                  colW={colW}
+                                  showStatus={showCol('status')}
+                                  showPriority={showCol('priority')}
+                                  showAssignee={showCol('assignee')}
+                                  showProject={showCol('project')}
+                                  showDue={showCol('due_date')}
+                                  showCreatedAt={showCol('created_at')}
+                                  showEstimate={showCol('estimate_minutes')}
+                                  showLogged={showCol('logged')}
+                                  onOpen={() => openTask(task.id)}
+                                  onUpdateTask={(updates) => updateTask.mutate({ id: task.id, ...updates })}
+                                />
+                              ))}
+                            </React.Fragment>
+                          )
+                        })
+                      ) : (
+                        // Flat task rows
+                        group.tasks.map((task, idx) => (
+                          <TaskRow
+                            key={task.id}
+                            task={task}
+                            rowNum={idx + 1}
+                            timeTotals={timeTotals}
+                            colW={colW}
+                            showStatus={showCol('status')}
+                            showPriority={showCol('priority')}
+                            showAssignee={showCol('assignee')}
+                            showProject={showCol('project')}
+                            showDue={showCol('due_date')}
+                            showCreatedAt={showCol('created_at')}
+                            showEstimate={showCol('estimate_minutes')}
+                            showLogged={showCol('logged')}
+                            onOpen={() => openTask(task.id)}
+                            onUpdateTask={(updates) => updateTask.mutate({ id: task.id, ...updates })}
+                          />
+                        ))
+                      )
+                    )}
                   </React.Fragment>
                 )
               })}

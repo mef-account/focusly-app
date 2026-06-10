@@ -189,6 +189,8 @@ export type ViewGroupBy =
   | 'assignee'
   | 'priority'
   | 'created_at'
+  | 'portfolio'
+  | 'workspace'
   | 'none'
 
 export type ViewFilterOperator =

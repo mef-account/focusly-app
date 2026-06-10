@@ -12,7 +12,7 @@ import { Separator } from '@/components/ui/separator'
 import { StatusIcon } from '@/components/tasks/StatusIcon'
 import { PriorityIcon } from '@/components/tasks/PriorityIcon'
 import { STATUS_LABELS, PRIORITY_LABELS, cn } from '@/lib/utils'
-import type { TaskStatus, TaskPriority, Project, Profile } from '@/types'
+import type { TaskStatus, TaskPriority, Project, Profile, Portfolio, Workspace } from '@/types'
 
 const STATUSES: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'done', 'cancelled']
 const PRIORITIES: TaskPriority[] = ['urgent', 'high', 'medium', 'low', 'none']
@@ -22,6 +22,8 @@ export interface ActiveFilters {
   priorities: TaskPriority[]
   projectIds: string[]
   assigneeIds: string[]
+  portfolioIds: string[]
+  workspaceIds: string[]
 }
 
 interface ViewFilterPanelProps {
@@ -29,18 +31,22 @@ interface ViewFilterPanelProps {
   onChange: (filters: ActiveFilters) => void
   projects: Project[]
   profiles: Profile[]
+  portfolios: Portfolio[]
+  workspaces: Workspace[]
 }
 
-type FilterField = 'status' | 'priority' | 'project' | 'assignee'
+type FilterField = 'status' | 'priority' | 'project' | 'assignee' | 'portfolio' | 'workspace'
 
 const FILTER_FIELDS: { id: FilterField; label: string }[] = [
   { id: 'status', label: 'Status' },
   { id: 'priority', label: 'Priority' },
   { id: 'project', label: 'Project' },
   { id: 'assignee', label: 'Assignee' },
+  { id: 'portfolio', label: 'Portfolio' },
+  { id: 'workspace', label: 'Workspace' },
 ]
 
-export function ViewFilterPanel({ filters, onChange, projects, profiles }: ViewFilterPanelProps) {
+export function ViewFilterPanel({ filters, onChange, projects, profiles, portfolios, workspaces }: ViewFilterPanelProps) {
   const [open, setOpen] = useState(false)
   const [expandedField, setExpandedField] = useState<FilterField | null>(null)
 
@@ -48,7 +54,9 @@ export function ViewFilterPanel({ filters, onChange, projects, profiles }: ViewF
     filters.statuses.length +
     filters.priorities.length +
     filters.projectIds.length +
-    filters.assigneeIds.length
+    filters.assigneeIds.length +
+    filters.portfolioIds.length +
+    filters.workspaceIds.length
 
   function toggleStatus(s: TaskStatus) {
     const next = filters.statuses.includes(s)
@@ -78,8 +86,22 @@ export function ViewFilterPanel({ filters, onChange, projects, profiles }: ViewF
     onChange({ ...filters, assigneeIds: next })
   }
 
+  function togglePortfolio(id: string) {
+    const next = filters.portfolioIds.includes(id)
+      ? filters.portfolioIds.filter((x) => x !== id)
+      : [...filters.portfolioIds, id]
+    onChange({ ...filters, portfolioIds: next })
+  }
+
+  function toggleWorkspace(id: string) {
+    const next = filters.workspaceIds.includes(id)
+      ? filters.workspaceIds.filter((x) => x !== id)
+      : [...filters.workspaceIds, id]
+    onChange({ ...filters, workspaceIds: next })
+  }
+
   function clearAll() {
-    onChange({ statuses: [], priorities: [], projectIds: [], assigneeIds: [] })
+    onChange({ statuses: [], priorities: [], projectIds: [], assigneeIds: [], portfolioIds: [], workspaceIds: [] })
   }
 
   return (
@@ -181,6 +203,33 @@ export function ViewFilterPanel({ filters, onChange, projects, profiles }: ViewF
                 </button>
               ) : null
             })}
+            {filters.portfolioIds.map((id) => {
+              const p = portfolios.find((x) => x.id === id)
+              return p ? (
+                <button
+                  key={id}
+                  onClick={() => togglePortfolio(id)}
+                  className="flex items-center gap-1 rounded-full border bg-accent px-2 py-0.5 text-xs hover:bg-destructive/10 hover:border-destructive/40 hover:text-destructive transition-colors"
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
+                  {p.name}
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              ) : null
+            })}
+            {filters.workspaceIds.map((id) => {
+              const w = workspaces.find((x) => x.id === id)
+              return w ? (
+                <button
+                  key={id}
+                  onClick={() => toggleWorkspace(id)}
+                  className="flex items-center gap-1 rounded-full border bg-accent px-2 py-0.5 text-xs hover:bg-destructive/10 hover:border-destructive/40 hover:text-destructive transition-colors"
+                >
+                  {w.name}
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              ) : null
+            })}
           </div>
         )}
 
@@ -246,7 +295,6 @@ export function ViewFilterPanel({ filters, onChange, projects, profiles }: ViewF
 
                   {field.id === 'project' && (
                     <>
-                      {/* No project option */}
                       <button
                         onClick={() => toggleProject('__no_project__')}
                         className={cn(
@@ -297,6 +345,49 @@ export function ViewFilterPanel({ filters, onChange, projects, profiles }: ViewF
                           </span>
                           <span className="truncate">{a.name ?? 'Unknown'}</span>
                           {filters.assigneeIds.includes(a.id) && (
+                            <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
+                          )}
+                        </button>
+                      ))
+                    ))}
+
+                  {field.id === 'portfolio' &&
+                    (portfolios.length === 0 ? (
+                      <p className="px-2 py-1 text-xs text-muted-foreground">No portfolios</p>
+                    ) : (
+                      portfolios.map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => togglePortfolio(p.id)}
+                          className={cn(
+                            'flex w-full items-center gap-2 rounded px-2 py-1 text-sm transition-colors hover:bg-accent',
+                            filters.portfolioIds.includes(p.id) && 'bg-accent font-medium'
+                          )}
+                        >
+                          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
+                          <span className="truncate">{p.name}</span>
+                          {filters.portfolioIds.includes(p.id) && (
+                            <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
+                          )}
+                        </button>
+                      ))
+                    ))}
+
+                  {field.id === 'workspace' &&
+                    (workspaces.length === 0 ? (
+                      <p className="px-2 py-1 text-xs text-muted-foreground">No workspaces</p>
+                    ) : (
+                      workspaces.map((w) => (
+                        <button
+                          key={w.id}
+                          onClick={() => toggleWorkspace(w.id)}
+                          className={cn(
+                            'flex w-full items-center gap-2 rounded px-2 py-1 text-sm transition-colors hover:bg-accent',
+                            filters.workspaceIds.includes(w.id) && 'bg-accent font-medium'
+                          )}
+                        >
+                          <span className="truncate">{w.name}</span>
+                          {filters.workspaceIds.includes(w.id) && (
                             <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
                           )}
                         </button>
