@@ -76,8 +76,11 @@ export const useTimerStore = create<TimerStore>()(
     }),
     {
       name: 'focusly-timer',
-      // Never resume a running timer after refresh — only persist idle metadata
+      // Persist running state and startedAt so the timer survives navigation/refresh.
+      // seconds is always recomputed from startedAt on rehydration — never stale.
       partialize: (state) => ({
+        running: state.running,
+        startedAt: state.startedAt,
         description: state.description,
         projectId: state.projectId,
         taskId: state.taskId,
@@ -85,10 +88,12 @@ export const useTimerStore = create<TimerStore>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
-        // Clear any running session restored from older persisted state
-        state.running = false
-        state.seconds = 0
-        state.startedAt = null
+        // Recompute elapsed seconds from startedAt instead of restoring a stale value
+        if (state.running && state.startedAt) {
+          state.seconds = Math.floor((Date.now() - state.startedAt) / 1000)
+        } else {
+          state.seconds = 0
+        }
       },
     }
   )
