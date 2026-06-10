@@ -70,7 +70,7 @@ function ProjectNameRow({ project }: { project: Project }) {
 
   return (
     <>
-      <div className={cn(ROW_H, 'flex items-center gap-2 pl-5 pr-2 group hover:bg-accent/50 transition-colors')}>
+      <div className={cn(ROW_H, 'flex items-center gap-2 pl-10 pr-2 group hover:bg-accent/50 transition-colors')}>
         <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: project.color }} />
         <Link
           href={`/app/projects/${project.id}`}
