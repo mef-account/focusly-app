@@ -6,8 +6,10 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PriorityIcon } from '@/components/tasks/PriorityIcon'
 import { useTasksDueToday } from '@/lib/queries/useTasks'
-import { taskDueDateLabel, sortTasksByPriority } from '@/lib/utils'
+import { taskDueDateLabel, sortTasksByPriority, formatMinutes } from '@/lib/utils'
 import type { Task } from '@/types'
+
+const DEFAULT_DUR = 30
 
 function TaskRow({ task }: { task: Task }) {
   const dueLabel = task.due_date ? taskDueDateLabel(task.due_date) : null
@@ -15,6 +17,9 @@ function TaskRow({ task }: { task: Task }) {
   return (
     <div className="flex items-center gap-2 py-2">
       <span className="min-w-0 flex-1 truncate text-sm">{task.title}</span>
+      <span className="shrink-0 text-xs text-muted-foreground">
+        {formatMinutes(task.estimate_minutes ?? DEFAULT_DUR)}
+      </span>
 
       {dueLabel && (
         <div className="flex shrink-0 items-center gap-1.5">

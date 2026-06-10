@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PriorityIcon } from '@/components/tasks/PriorityIcon'
 import { useTasksDueThisWeek } from '@/lib/queries/useTasks'
-import { taskDueDateLabel } from '@/lib/utils'
+import { taskDueDateLabel, formatMinutes } from '@/lib/utils'
+
+const DEFAULT_DUR = 30
 
 export function UpcomingWidget() {
   const { data: tasks, isLoading } = useTasksDueThisWeek()
@@ -37,8 +39,11 @@ export function UpcomingWidget() {
           {tasks.slice(0, 8).map((task) => {
             const { label } = taskDueDateLabel(task.due_date!)
             return (
-              <div key={task.id} className="flex items-center justify-between gap-2 py-1">
-                <span className="min-w-0 truncate text-sm">{task.title}</span>
+              <div key={task.id} className="flex items-center gap-2 py-1">
+                <span className="min-w-0 flex-1 truncate text-sm">{task.title}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {formatMinutes(task.estimate_minutes ?? DEFAULT_DUR)}
+                </span>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <span className="text-xs font-medium text-muted-foreground">{label}</span>
                   <PriorityIcon priority={task.priority} />
