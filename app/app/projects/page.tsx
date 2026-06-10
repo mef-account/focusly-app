@@ -321,17 +321,16 @@ export default function ProjectsPage() {
 
   return (
     <div className="flex h-full flex-col gap-0">
-      {/* Header — title | workspace tabs | action buttons */}
+      {/* Header — project count | workspace tabs | action buttons */}
       <div className="flex items-center gap-4 border-b pb-3">
         <div className="shrink-0">
-          <h2 className="text-xl font-bold">Structure</h2>
           <p className="text-sm text-muted-foreground">
-            {projects.length} project{projects.length !== 1 ? 's' : ''}
+            {activeProjects.length} project{activeProjects.length !== 1 ? 's' : ''}
           </p>
         </div>
 
-        {/* Workspace tabs — centre */}
-        <div className="flex flex-1 items-center gap-1 flex-wrap pl-8">
+        {/* Workspace tabs */}
+        <div className="flex flex-1 items-center gap-1 flex-wrap">
           <button
             onClick={() => setSelectedWorkspaceId(null)}
             className={cn(
