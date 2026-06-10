@@ -9,11 +9,10 @@ export default function DashboardPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <DashboardHeader />
 
-      {/* Timer — full width */}
-      <TimerWidget />
-
-      {/* Daily Progress — full width */}
-      <DailyProgressWidget />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <TimerWidget />
+        <DailyProgressWidget />
+      </div>
 
       {/* Main grid: 2 columns */}
       <div className="grid gap-4 lg:grid-cols-2">
