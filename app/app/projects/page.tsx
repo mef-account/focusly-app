@@ -32,7 +32,7 @@ import { usePortfolios } from '@/lib/queries/usePortfolios'
 import { cn } from '@/lib/utils'
 import type { Project, Portfolio, Workspace } from '@/types'
 
-const ROW_H = 'h-9'
+const ROW_H = 'h-7'
 
 type Row =
   | { kind: 'portfolio'; portfolio: Portfolio; projectCount: number }

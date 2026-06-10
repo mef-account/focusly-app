@@ -19,7 +19,7 @@ import type { Project } from '@/types'
 
 export const GANTT_TOOLBAR_H = 'h-8'
 
-const ROW_H = 'h-9'
+const ROW_H = 'h-7'
 
 export type StructureGanttRow =
   | { kind: 'portfolio'; portfolio: { id: string }; projectCount: number }
@@ -180,7 +180,7 @@ function GanttBarRow({
 
       {bar ? (
         <div
-          className="absolute top-1/2 z-[1] h-5 -translate-y-1/2 rounded-md shadow-sm"
+          className="absolute top-1/2 z-[1] h-3.5 -translate-y-1/2 rounded-sm shadow-sm"
           style={{
             left: bar.leftPx,
             width: bar.widthPx,
@@ -202,7 +202,7 @@ interface StructureGanttProps {
 }
 
 export function StructureGantt({ rows, windowStart, windowEnd }: StructureGanttProps) {
-  const [scale, setScale] = useState<GanttScale>('month')
+  const [scale, setScale] = useState<GanttScale>('week')
   const [zoom, setZoom] = useState(1)
   const [isDragging, setIsDragging] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -331,18 +331,18 @@ export function StructureGantt({ rows, windowStart, windowEnd }: StructureGanttP
           {/* Column headers */}
           {scale === 'day' ? (
             <div className={cn(ROW_H, 'sticky top-0 z-10 flex flex-col border-b bg-background')}>
-              <div className="flex h-4 border-b border-border/40">
+              <div className="flex h-3.5 border-b border-border/40">
                 {weekBands.map((band) => (
                   <div
                     key={band.key}
-                    className="shrink-0 flex items-center justify-center border-r border-border/40 bg-muted/30 text-[10px] font-semibold tabular-nums text-muted-foreground"
+                    className="shrink-0 flex items-center justify-center border-r border-border/40 bg-muted/30 text-[9px] font-semibold tabular-nums text-muted-foreground"
                     style={{ width: band.width }}
                   >
                     W{band.weekNum}
                   </div>
                 ))}
               </div>
-              <div className="flex h-5">
+              <div className="flex h-3.5">
                 {columns.map((col) => (
                   <div
                     key={col.date.toISOString()}
