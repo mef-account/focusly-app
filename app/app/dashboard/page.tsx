@@ -23,8 +23,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Right: today's daily note */}
-      <div className="w-80 xl:w-96 shrink-0 border-l p-4">
+      {/* Right: today's daily note — flush to top, wider */}
+      <div className="w-[26rem] xl:w-[32rem] shrink-0 border-l">
         <DailyNoteWidget />
       </div>
     </div>
