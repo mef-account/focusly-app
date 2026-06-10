@@ -331,7 +331,7 @@ export default function ProjectsPage() {
         </div>
 
         {/* Workspace tabs — centre */}
-        <div className="flex flex-1 items-center gap-1 flex-wrap">
+        <div className="flex flex-1 items-center gap-1 flex-wrap pl-8">
           <button
             onClick={() => setSelectedWorkspaceId(null)}
             className={cn(
