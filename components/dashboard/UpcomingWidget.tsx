@@ -41,7 +41,7 @@ export function UpcomingWidget() {
           Nothing due tomorrow ✨
         </p>
       ) : (
-        <div className="space-y-1">
+        <div className="flex-1 overflow-y-auto space-y-1">
           {sortedTasks.map((task) => {
             const { label } = taskDueDateLabel(task.due_date!)
             return (

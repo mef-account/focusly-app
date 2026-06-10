@@ -13,27 +13,31 @@ export default function DashboardPage() {
         <DashboardHeader />
       </div>
 
-      {/* 3 equal columns */}
-      <div className="grid flex-1 grid-cols-3 gap-4 overflow-hidden pb-6">
-        {/* Col 1: Timer (compact) → Today's Tasks (fills rest) */}
-        <div className="flex min-h-0 flex-col gap-4">
-          <TimerWidget />
-          <div className="min-h-0 flex-1">
-            <TodaysTasksWidget />
-          </div>
-        </div>
+      {/*
+        3 cols × 2 rows:
+          row 1 (auto)  : Timer | Progress | Note (row-span-2)
+          row 2 (1fr)   : Tasks | Tomorrow  | ↑
+      */}
+      <div className="grid flex-1 grid-cols-3 grid-rows-[auto_1fr] gap-4 overflow-hidden pb-6">
+        {/* Row 1, Col 1 */}
+        <TimerWidget />
 
-        {/* Col 2: Today's Progress (compact) → Tomorrow (fills rest) */}
-        <div className="flex min-h-0 flex-col gap-4">
-          <DailyProgressWidget />
-          <div className="min-h-0 flex-1">
-            <UpcomingWidget />
-          </div>
-        </div>
+        {/* Row 1, Col 2 */}
+        <DailyProgressWidget />
 
-        {/* Col 3: Daily Note (full height) */}
-        <div className="flex min-h-0 flex-col overflow-hidden">
+        {/* Col 3 — spans both rows */}
+        <div className="row-span-2 flex flex-col overflow-hidden">
           <DailyNoteWidget />
+        </div>
+
+        {/* Row 2, Col 1 */}
+        <div className="flex min-h-0 flex-col overflow-hidden">
+          <TodaysTasksWidget />
+        </div>
+
+        {/* Row 2, Col 2 */}
+        <div className="flex min-h-0 flex-col overflow-hidden">
+          <UpcomingWidget />
         </div>
       </div>
     </div>

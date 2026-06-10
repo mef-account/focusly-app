@@ -62,7 +62,7 @@ export function TodaysTasksWidget() {
           Nothing due today 🎉
         </p>
       ) : (
-        <div className="divide-y divide-border">
+        <div className="flex-1 overflow-y-auto divide-y divide-border">
           {sortedTasks.map((task) => (
             <TaskRow key={task.id} task={task} />
           ))}
