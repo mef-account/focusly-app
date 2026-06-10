@@ -9,11 +9,23 @@ import { NotePanel } from '@/components/notes/NotePanel'
 import { TaskSheet } from '@/components/tasks/TaskSheet'
 import { QuickCreateTaskDialog } from '@/components/tasks/QuickCreateTaskDialog'
 import { useQuickCreateStore } from '@/store/useQuickCreateStore'
+import { useTimerStore } from '@/store/useTimerStore'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const openQuickCreate = useQuickCreateStore((s) => s.open)
   const isQuickCreateOpen = useQuickCreateStore((s) => s.isOpen)
+
+  // Sync timer state across browser tabs via the storage event
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'focusly-timer') {
+        useTimerStore.persist.rehydrate()
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
