@@ -321,15 +321,46 @@ export default function ProjectsPage() {
 
   return (
     <div className="flex h-full flex-col gap-0">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-4">
-        <div>
+      {/* Header — title | workspace tabs | action buttons */}
+      <div className="flex items-center gap-4 border-b pb-3">
+        <div className="shrink-0">
           <h2 className="text-xl font-bold">Structure</h2>
           <p className="text-sm text-muted-foreground">
             {projects.length} project{projects.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Workspace tabs — centre */}
+        <div className="flex flex-1 items-center gap-1 flex-wrap">
+          <button
+            onClick={() => setSelectedWorkspaceId(null)}
+            className={cn(
+              'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+              selectedWorkspaceId === null
+                ? 'bg-accent text-accent-foreground'
+                : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+            )}
+          >
+            All
+          </button>
+          {loadingWorkspaces ? (
+            <div className="flex gap-2">
+              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-8 w-20 rounded-md" />)}
+            </div>
+          ) : (
+            workspaces.map((ws) => (
+              <WorkspaceTab
+                key={ws.id}
+                workspace={ws}
+                active={selectedWorkspaceId === ws.id}
+                onSelect={() => setSelectedWorkspaceId(ws.id)}
+              />
+            ))
+          )}
+        </div>
+
+        {/* Action buttons — right */}
+        <div className="flex shrink-0 items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setWorkspaceDialogOpen(true)} className="gap-1.5 text-xs h-8">
             <Building2 className="h-3.5 w-3.5" /> Workspace
           </Button>
@@ -342,37 +373,8 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {/* Workspace tabs */}
-      <div className="flex items-center gap-1 border-b pb-2 flex-wrap">
-        <button
-          onClick={() => setSelectedWorkspaceId(null)}
-          className={cn(
-            'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-            selectedWorkspaceId === null
-              ? 'bg-accent text-accent-foreground'
-              : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
-          )}
-        >
-          All
-        </button>
-        {loadingWorkspaces ? (
-          <div className="flex gap-2">
-            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-8 w-20 rounded-md" />)}
-          </div>
-        ) : (
-          workspaces.map((ws) => (
-            <WorkspaceTab
-              key={ws.id}
-              workspace={ws}
-              active={selectedWorkspaceId === ws.id}
-              onSelect={() => setSelectedWorkspaceId(ws.id)}
-            />
-          ))
-        )}
-      </div>
-
       {/* Table + Gantt */}
-      <div className="flex flex-1 min-h-0 pt-3">
+      <div className="flex flex-1 min-h-0 pt-2">
         {isLoading ? (
           <div className="space-y-3 w-full">
             {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-9 rounded-lg" />)}
