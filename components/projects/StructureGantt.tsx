@@ -258,6 +258,22 @@ export function StructureGantt({ rows, windowStart, windowEnd }: StructureGanttP
     }
   }, [isDragging, handleDragMove, handleDragEnd])
 
+  // Center today line in the visible chart area on load and when scale/zoom changes
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || todayLeftPx === null) return
+
+    const centerToday = () => {
+      const maxScroll = el.scrollWidth - el.clientWidth
+      if (maxScroll <= 0) return
+      const target = todayLeftPx - el.clientWidth / 2
+      el.scrollLeft = Math.max(0, Math.min(target, maxScroll))
+    }
+
+    centerToday()
+    requestAnimationFrame(centerToday)
+  }, [todayLeftPx, timelineWidth, scale, zoom])
+
   return (
     <div className="flex flex-1 flex-col min-h-0 min-w-0">
       {/* Scale toolbar */}
