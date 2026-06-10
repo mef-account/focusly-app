@@ -9,7 +9,6 @@ import {
   FileText,
   TableProperties,
   Timer,
-  BarChart3,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -30,7 +29,6 @@ const NAV_ITEMS = [
   { label: 'Daily', href: '/app/notes', icon: FileText },
   { label: 'Views', href: '/app/views', icon: TableProperties },
   { label: 'Tracker', href: '/app/tracker', icon: Timer },
-  { label: 'Reports', href: '/app/reports', icon: BarChart3 },
 ]
 
 export function Sidebar() {
