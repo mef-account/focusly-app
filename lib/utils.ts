@@ -32,6 +32,21 @@ export function formatMinutes(minutes: number): string {
   return `${m}m`
 }
 
+/** Parses "6:17:52", "17:11", "2h 30m", "45m", "90" → seconds */
+export function parseDuration(input: string): number | null {
+  const trimmed = input.trim().toLowerCase()
+  const colonMatch = trimmed.match(/^(\d+):(\d{1,2})(?::(\d{1,2}))?$/)
+  if (colonMatch) {
+    const h = parseInt(colonMatch[1], 10)
+    const m = parseInt(colonMatch[2], 10)
+    const s = colonMatch[3] ? parseInt(colonMatch[3], 10) : 0
+    if (m >= 60 || s >= 60) return null
+    return h * 3600 + m * 60 + s
+  }
+  const minutes = parseEstimate(trimmed)
+  return minutes !== null ? minutes * 60 : null
+}
+
 /** Parses "2h 30m", "1h", "45m", "90" (treated as minutes) → minutes */
 export function parseEstimate(input: string): number | null {
   const trimmed = input.trim().toLowerCase()

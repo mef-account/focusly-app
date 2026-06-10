@@ -1,16 +1,16 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Square, Timer, Trash2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useTimerStore } from '@/store/useTimerStore'
 import { useTaskTimer } from '@/lib/hooks/useTaskTimer'
-import { useTimeEntriesToday, useDeleteTimeEntry, useTimeEntries } from '@/lib/queries/useTimeEntries'
+import { useTimeEntriesToday, useDeleteTimeEntry, useUpdateTimeEntry, useTimeEntries } from '@/lib/queries/useTimeEntries'
 import { ManualEntryDialog } from '@/components/tracker/ManualEntryDialog'
-import { useState } from 'react'
-import { formatDuration, cn } from '@/lib/utils'
+import { formatDuration, parseDuration, cn } from '@/lib/utils'
+import type { TimeEntry } from '@/types'
 import { startOfWeek, endOfWeek, format } from 'date-fns'
 
 function RunningBanner() {
@@ -51,6 +51,57 @@ function RunningBanner() {
         </Button>
       </div>
     </div>
+  )
+}
+
+function DurationCell({ entry }: { entry: TimeEntry }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(formatDuration(entry.duration_seconds ?? 0))
+  const updateEntry = useUpdateTimeEntry()
+  const seconds = entry.duration_seconds ?? 0
+
+  useEffect(() => {
+    if (!editing) setValue(formatDuration(seconds))
+  }, [seconds, editing])
+
+  function save() {
+    const parsed = parseDuration(value)
+    if (parsed !== null && parsed >= 1 && parsed !== seconds) {
+      updateEntry.mutate({ id: entry.id, duration_seconds: parsed })
+    } else {
+      setValue(formatDuration(seconds))
+    }
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        className="w-24 rounded border bg-background px-2 py-0.5 text-right font-mono text-sm tabular-nums outline-none focus:ring-1 focus:ring-ring"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') save()
+          if (e.key === 'Escape') {
+            setValue(formatDuration(seconds))
+            setEditing(false)
+          }
+        }}
+      />
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      className="font-mono tabular-nums hover:text-primary hover:underline transition-colors"
+      onClick={() => setEditing(true)}
+      title="Click to edit duration"
+    >
+      {formatDuration(seconds)}
+    </button>
   )
 }
 
@@ -145,8 +196,8 @@ export default function TrackerPage() {
                       <Badge variant="secondary" className="text-[10px] capitalize">{entry.tag}</Badge>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-right font-mono tabular-nums">
-                    {formatDuration(entry.duration_seconds ?? 0)}
+                  <td className="px-4 py-2.5 text-right">
+                    <DurationCell entry={entry} />
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     <button
