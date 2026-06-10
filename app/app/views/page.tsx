@@ -13,7 +13,13 @@ import {
   MoreHorizontal,
   Check,
   Clock,
+  FolderKanban,
+  CalendarIcon,
+  X,
 } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useTasks, useUpdateTask } from '@/lib/queries/useTasks'
 import { useTimeTotalsByTask } from '@/lib/queries/useTimeEntries'
 import { useProjects } from '@/lib/queries/useProjects'
@@ -45,8 +51,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
-import { STATUS_LABELS, PRIORITY_LABELS, formatDate, formatMinutes, formatDuration, cn } from '@/lib/utils'
-import type { Task, TaskStatus, TaskPriority, ViewGroupBy } from '@/types'
+import { STATUS_LABELS, PRIORITY_LABELS, formatDate, formatMinutes, formatDuration, parseEstimate, cn } from '@/lib/utils'
+import type { Task, TaskStatus, TaskPriority, ViewGroupBy, Project } from '@/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,8 +60,8 @@ const DEFAULT_DISPLAY: DisplayOptions = {
   groupBy: 'none',
   subGroupBy: 'none',
   sortField: 'created_at',
-  sortDir: 'asc',
-  visibleColumns: ['status', 'assignee', 'priority', 'project', 'due_date', 'created_at'],
+  sortDir: 'desc',
+  visibleColumns: ['status', 'assignee', 'priority', 'project', 'due_date', 'estimate_minutes', 'logged'],
 }
 
 const DEFAULT_FILTERS: ActiveFilters = {
@@ -186,7 +192,7 @@ function viewFiltersToActive(vf: { field: string; operator: string; value: unkno
 
 // ─── Column resize ────────────────────────────────────────────────────────────
 
-const COL_PERSIST_KEY = 'focusly:views-col-widths-v5'
+const COL_PERSIST_KEY = 'focusly:views-col-widths-v6'
 
 const DEFAULT_COL_WIDTHS: Record<string, number> = {
   title:            380,
@@ -604,28 +610,28 @@ function ViewsPageInner() {
               <col style={{ width: 24 }} />
               <col style={{ width: colW['title'] }} />
               {showCol('status')           && <col style={{ width: colW['status'] }} />}
-              {showCol('priority')         && <col style={{ width: colW['priority'] }} />}
               {showCol('assignee')         && <col style={{ width: colW['assignee'] }} />}
+              {showCol('priority')         && <col style={{ width: colW['priority'] }} />}
               {showCol('project')          && <col style={{ width: colW['project'] }} />}
               {showCol('due_date')         && <col style={{ width: colW['due_date'] }} />}
-              {showCol('created_at')       && <col style={{ width: colW['created_at'] }} />}
               {showCol('estimate_minutes') && <col style={{ width: colW['estimate_minutes'] }} />}
               {showCol('logged')           && <col style={{ width: colW['logged'] }} />}
+              {showCol('created_at')       && <col style={{ width: colW['created_at'] }} />}
               <col style={{ width: 32 }} />
             </colgroup>
             {/* Column headers */}
             <thead className="sticky top-0 z-10 border-b bg-background">
               <tr>
                 <th style={{ width: 24 }} className="h-8 px-1 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground">#</th>
-                <ColHeader label="Task" col="title" width={colW['title']} onResize={startResize} />
+                <ColHeader label="Task"         col="title"           width={colW['title']}           onResize={startResize} />
                 {showCol('status')           && <ColHeader label="Status"       col="status"           width={colW['status']}           onResize={startResize} center />}
-                {showCol('priority')         && <ColHeader label="Priority"     col="priority"         width={colW['priority']}         onResize={startResize} />}
                 {showCol('assignee')         && <ColHeader label="Assignee"     col="assignee"         width={colW['assignee']}         onResize={startResize} />}
+                {showCol('priority')         && <ColHeader label="Priority"     col="priority"         width={colW['priority']}         onResize={startResize} />}
                 {showCol('project')          && <ColHeader label="Project"      col="project"          width={colW['project']}          onResize={startResize} />}
                 {showCol('due_date')         && <ColHeader label="Due date"     col="due_date"         width={colW['due_date']}         onResize={startResize} />}
-                {showCol('created_at')       && <ColHeader label="Created date" col="created_at"       width={colW['created_at']}       onResize={startResize} />}
                 {showCol('estimate_minutes') && <ColHeader label="Estimate"     col="estimate_minutes" width={colW['estimate_minutes']} onResize={startResize} />}
                 {showCol('logged')           && <ColHeader label="Logged"       col="logged"           width={colW['logged']}           onResize={startResize} />}
+                {showCol('created_at')       && <ColHeader label="Created date" col="created_at"       width={colW['created_at']}       onResize={startResize} />}
                 <th style={{ width: 32 }} className="h-7 px-1 text-center text-xs font-medium uppercase tracking-wide text-muted-foreground select-none whitespace-nowrap">Timer</th>
                 <th style={{ width: 32 }} className="h-8 px-1" />
               </tr>
@@ -687,17 +693,17 @@ function ViewsPageInner() {
                         </span>
                       </td>
                       {showCol('status') && <td style={{ width: colW['status'] }} />}
-                      {showCol('priority') && <td style={{ width: colW['priority'] }} />}
                       {showCol('assignee') && <td style={{ width: colW['assignee'] }} />}
+                      {showCol('priority') && <td style={{ width: colW['priority'] }} />}
                       {showCol('project') && <td style={{ width: colW['project'] }} />}
                       {showCol('due_date') && (
                         <td style={{ width: colW['due_date'] }} className="h-7 px-2 text-xs text-muted-foreground tabular-nums">
                           {hMaxDue ? formatDate(hMaxDue) : ''}
                         </td>
                       )}
-                      {showCol('created_at') && <td style={{ width: colW['created_at'] }} />}
                       {showCol('estimate_minutes') && <td style={{ width: colW['estimate_minutes'] }} />}
                       {showCol('logged') && <td style={{ width: colW['logged'] }} />}
+                      {showCol('created_at') && <td style={{ width: colW['created_at'] }} />}
                       <td style={{ width: 32 }} />
                     </tr>
                   )
@@ -723,6 +729,7 @@ function ViewsPageInner() {
                                   rowNum={idx + 1}
                                   timeTotals={timeTotals}
                                   colW={colW}
+                                  projects={projects}
                                   showStatus={showCol('status')}
                                   showPriority={showCol('priority')}
                                   showAssignee={showCol('assignee')}
@@ -748,6 +755,7 @@ function ViewsPageInner() {
                             rowNum={idx + 1}
                             timeTotals={timeTotals}
                             colW={colW}
+                            projects={projects}
                             showStatus={showCol('status')}
                             showPriority={showCol('priority')}
                             showAssignee={showCol('assignee')}
@@ -890,6 +898,7 @@ interface TaskRowProps {
   rowNum: number
   timeTotals: Record<string, number>
   colW: Record<string, number>
+  projects: Project[]
   showStatus: boolean
   showPriority: boolean
   showAssignee: boolean
@@ -918,6 +927,7 @@ function TaskRow({
   rowNum,
   timeTotals,
   colW,
+  projects,
   showStatus,
   showPriority,
   showAssignee,
@@ -932,6 +942,9 @@ function TaskRow({
 }: TaskRowProps) {
   const secs = timeTotals[task.id] ?? 0
   const dueOverdue = isOverdue(task.due_date)
+  const [dueDateOpen, setDueDateOpen] = useState(false)
+  const [estimateInput, setEstimateInput] = useState('')
+  const [editingEstimate, setEditingEstimate] = useState(false)
 
   return (
     <tr
@@ -957,28 +970,35 @@ function TaskRow({
       {showStatus && (
         <td style={{ width: colW['status'] }} className="h-7 px-1 text-center" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-center">
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <button
-                  className="flex h-5 w-5 items-center justify-center rounded hover:bg-accent transition-colors"
-                  title={STATUS_LABELS[task.status]}
-                />
-              }
-            >
-              <StatusIcon status={task.status} />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              {STATUSES.map((s) => (
-                <DropdownMenuItem key={s} onClick={() => onUpdateTask({ status: s })}>
-                  <StatusIcon status={s} />
-                  <span className="text-sm">{STATUS_LABELS[s]}</span>
-                  {task.status === s && <Check className="ml-auto h-3.5 w-3.5" />}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <button
+                    className="flex h-5 w-5 items-center justify-center rounded hover:bg-accent transition-colors"
+                    title={STATUS_LABELS[task.status]}
+                  />
+                }
+              >
+                <StatusIcon status={task.status} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {STATUSES.map((s) => (
+                  <DropdownMenuItem key={s} onClick={() => onUpdateTask({ status: s })}>
+                    <StatusIcon status={s} />
+                    <span className="text-sm">{STATUS_LABELS[s]}</span>
+                    {task.status === s && <Check className="ml-auto h-3.5 w-3.5" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
+        </td>
+      )}
+
+      {/* Assignee */}
+      {showAssignee && (
+        <td style={{ width: colW['assignee'] }} className="h-7 px-2" onClick={(e) => e.stopPropagation()}>
+          <AssigneePicker value={task.assignee_id} assignee={task.assignee} stopPropagation onChange={(id) => onUpdateTask({ assignee_id: id })} />
         </td>
       )}
 
@@ -1007,32 +1027,123 @@ function TaskRow({
         </td>
       )}
 
-      {/* Assignee */}
-      {showAssignee && (
-        <td style={{ width: colW['assignee'] }} className="h-7 px-2" onClick={(e) => e.stopPropagation()}>
-          <AssigneePicker value={task.assignee_id} assignee={task.assignee} stopPropagation onChange={(id) => onUpdateTask({ assignee_id: id })} />
+      {/* Project — inline editable */}
+      {showProject && (
+        <td style={{ width: colW['project'] }} className="h-7 px-1" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <button className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-xs hover:bg-accent transition-colors" />
+              }
+            >
+              {task.project ? (
+                <>
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: task.project.color }} />
+                  <span className="truncate text-muted-foreground">{task.project.name}</span>
+                </>
+              ) : (
+                <span className="flex items-center gap-1 text-muted-foreground/50">
+                  <FolderKanban className="h-3 w-3" />
+                  <span>—</span>
+                </span>
+              )}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => onUpdateTask({ project_id: null })}>
+                <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-muted-foreground">No project</span>
+                {!task.project_id && <Check className="ml-auto h-3.5 w-3.5" />}
+              </DropdownMenuItem>
+              {projects.map((p) => (
+                <DropdownMenuItem key={p.id} onClick={() => onUpdateTask({ project_id: p.id })}>
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                  <span className="truncate">{p.name}</span>
+                  {task.project_id === p.id && <Check className="ml-auto h-3.5 w-3.5" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </td>
       )}
 
-      {/* Project */}
-      {showProject && (
-        <td style={{ width: colW['project'] }} className="h-7 px-2">
-          {task.project ? (
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: task.project.color }} />
-              <span className="truncate">{task.project.name}</span>
-            </span>
+      {/* Due date — inline editable */}
+      {showDue && (
+        <td style={{ width: colW['due_date'] }} className="h-7 px-1" onClick={(e) => e.stopPropagation()}>
+          <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
+            <PopoverTrigger
+              render={
+                <button className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-xs hover:bg-accent transition-colors" />
+              }
+            >
+              <CalendarIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
+              <span className={cn('tabular-nums', dueOverdue ? 'font-medium text-red-500' : 'text-muted-foreground')}>
+                {task.due_date ? format(parseISO(task.due_date), 'MMM d') : '—'}
+              </span>
+              {task.due_date && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className="ml-auto text-muted-foreground hover:text-foreground"
+                  onClick={(e) => { e.stopPropagation(); onUpdateTask({ due_date: null }) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onUpdateTask({ due_date: null }) } }}
+                >
+                  <X className="h-3 w-3" />
+                </span>
+              )}
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={task.due_date ? parseISO(task.due_date) : undefined}
+                onSelect={(date) => {
+                  onUpdateTask({ due_date: date ? format(date, 'yyyy-MM-dd') : null })
+                  setDueDateOpen(false)
+                }}
+              />
+            </PopoverContent>
+          </Popover>
+        </td>
+      )}
+
+      {/* Estimate — inline editable */}
+      {showEstimate && (
+        <td style={{ width: colW['estimate_minutes'] }} className="h-7 px-1" onClick={(e) => e.stopPropagation()}>
+          {editingEstimate ? (
+            <input
+              autoFocus
+              className="w-full bg-transparent text-xs outline-none border-b border-primary tabular-nums text-foreground"
+              value={estimateInput}
+              onChange={(e) => setEstimateInput(e.target.value)}
+              onBlur={() => {
+                const mins = estimateInput.trim() ? parseEstimate(estimateInput) : null
+                onUpdateTask({ estimate_minutes: mins })
+                setEditingEstimate(false)
+                setEstimateInput('')
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                if (e.key === 'Escape') { setEditingEstimate(false); setEstimateInput('') }
+              }}
+            />
           ) : (
-            <span className="text-xs text-muted-foreground">—</span>
+            <button
+              className="w-full text-left text-xs text-muted-foreground tabular-nums hover:bg-accent rounded px-1 py-0.5 transition-colors"
+              onClick={() => {
+                setEstimateInput(task.estimate_minutes ? formatMinutes(task.estimate_minutes) : '')
+                setEditingEstimate(true)
+              }}
+            >
+              {task.estimate_minutes ? formatMinutes(task.estimate_minutes) : '—'}
+            </button>
           )}
         </td>
       )}
 
-      {/* Due date — red when overdue */}
-      {showDue && (
-        <td style={{ width: colW['due_date'] }} className="h-7 px-2">
-          <span className={cn('text-xs tabular-nums', dueOverdue ? 'font-medium text-red-500' : 'text-muted-foreground')}>
-            {formatDate(task.due_date) || '—'}
+      {/* Logged */}
+      {showLogged && (
+        <td style={{ width: colW['logged'] }} className="h-7 px-2">
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {secs ? formatDuration(secs) : '—'}
           </span>
         </td>
       )}
@@ -1042,24 +1153,6 @@ function TaskRow({
         <td style={{ width: colW['created_at'] }} className="h-7 px-2">
           <span className="text-xs text-muted-foreground tabular-nums">
             {formatDate(task.created_at.split('T')[0]) || '—'}
-          </span>
-        </td>
-      )}
-
-      {/* Estimate */}
-      {showEstimate && (
-        <td style={{ width: colW['estimate_minutes'] }} className="h-7 px-2">
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {task.estimate_minutes ? formatMinutes(task.estimate_minutes) : '—'}
-          </span>
-        </td>
-      )}
-
-      {/* Logged */}
-      {showLogged && (
-        <td style={{ width: colW['logged'] }} className="h-7 px-2">
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {secs ? formatDuration(secs) : '—'}
           </span>
         </td>
       )}
