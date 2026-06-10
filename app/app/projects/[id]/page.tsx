@@ -54,11 +54,11 @@ export default function ProjectDetailPage({ params }: PageProps) {
     if (!project || createNote.isPending) return
     try {
       const note = await createNote.mutateAsync({
+        note_type: 'project',
         project_id: id,
         task_id: null,
         title: project.name,
         content: '',
-        tag: 'work',
       })
       openNote(note.id, { mode: 'edit' })
     } catch {

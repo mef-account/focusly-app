@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Trash2, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import {
   AlertDialog,
@@ -17,45 +16,50 @@ import {
 } from '@/components/ui/alert-dialog'
 import { NotesList } from '@/components/notes/NotesList'
 import { MarkdownEditor } from '@/components/notes/MarkdownEditor'
-import { useNotes, useUpdateNote, useDeleteNote } from '@/lib/queries/useNotes'
-import { cn } from '@/lib/utils'
-import type { Tag } from '@/types'
+import { useDailyNotes, useEnsureTodayDailyNote, useUpdateNote, useDeleteNote } from '@/lib/queries/useNotes'
+import { format } from 'date-fns'
 
 const DEBOUNCE_MS = 800
 
 export default function NotesPage() {
-  const { data: notes } = useNotes()
+  const { data: notes } = useDailyNotes()
+  const ensureToday = useEnsureTodayDailyNote()
   const updateNote = useUpdateNote()
   const deleteNote = useDeleteNote()
 
   const [activeId, setActiveId] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
-  const [tag, setTag] = useState<Tag>('personal')
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
 
   const activeNote = notes?.find((n) => n.id === activeId) ?? null
+
+  // Ensure today's daily note exists on mount
+  useEffect(() => {
+    ensureToday.mutate(undefined, {
+      onSuccess: (note) => setActiveId((prev) => prev ?? note.id),
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load note into local state when selection changes
   useEffect(() => {
     if (activeNote) {
       setTitle(activeNote.title)
       setContent(activeNote.content)
-      setTag(activeNote.tag)
     }
   }, [activeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Select first note on mount
+  // Auto-select today's note once the list loads
   useEffect(() => {
-    if (notes?.length && !activeId) {
-      setActiveId(notes[0].id)
-    }
-  }, [notes, activeId])
+    if (!notes?.length || activeId) return
+    const todayNote = notes.find((n) => n.note_date === todayStr)
+    setActiveId(todayNote?.id ?? notes[0].id)
+  }, [notes, activeId, todayStr])
 
-  // Ctrl+S save shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -71,12 +75,11 @@ export default function NotesPage() {
     if (!activeId) return
     setSaving(true)
     updateNote.mutate(
-      { id: activeId, title, content, tag },
+      { id: activeId, title, content },
       { onSettled: () => setSaving(false) }
     )
-  }, [activeId, title, content, tag, updateNote])
+  }, [activeId, title, content, updateNote])
 
-  // Auto-save on content change (debounced)
   function handleContentChange(val: string) {
     setContent(val)
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -84,7 +87,7 @@ export default function NotesPage() {
       if (activeId) {
         setSaving(true)
         updateNote.mutate(
-          { id: activeId, content: val, title, tag },
+          { id: activeId, content: val, title },
           { onSettled: () => setSaving(false) }
         )
       }
@@ -97,51 +100,37 @@ export default function NotesPage() {
     }
   }
 
-  function cycleTag() {
-    const next: Tag = tag === 'personal' ? 'work' : 'personal'
-    setTag(next)
-    if (activeId) updateNote.mutate({ id: activeId, tag: next })
-  }
-
   async function handleDelete() {
     if (!activeId) return
     deleteNote.mutate(activeId)
     setActiveId(null)
     setDeleteOpen(false)
+    // Recreate today's note if the deleted one was today
+    if (activeNote?.note_date === todayStr) {
+      ensureToday.mutate(undefined, {
+        onSuccess: (note) => setActiveId(note.id),
+      })
+    }
   }
 
   return (
     <div className="-m-6 flex h-[calc(100vh-3.5rem)] overflow-hidden">
-      {/* Sidebar */}
       <div className="w-64 shrink-0">
         <NotesList activeId={activeId} onSelect={setActiveId} />
       </div>
 
-      {/* Editor */}
       {activeNote ? (
         <div className="flex flex-1 flex-col overflow-hidden">
-          {/* Note top bar */}
           <div className="flex items-center gap-2 border-b px-4 py-2">
             <Input
               spellCheck
-              className="h-8 border-0 bg-transparent p-0 text-base font-semibold shadow-none focus-visible:ring-0 flex-1"
+              className="h-8 flex-1 border-0 bg-transparent p-0 text-base font-semibold shadow-none focus-visible:ring-0"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onBlur={handleTitleBlur}
               placeholder="Untitled"
             />
-            <Badge
-              className={cn(
-                'cursor-pointer select-none text-xs capitalize transition-colors',
-                tag === 'work'
-                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                  : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-              )}
-              onClick={cycleTag}
-            >
-              {tag}
-            </Badge>
-            <span className="text-[10px] text-muted-foreground min-w-[60px] text-right">
+            <span className="min-w-[60px] text-right text-[10px] text-muted-foreground">
               {saving ? 'Saving…' : 'Saved'}
             </span>
             <Button
@@ -154,7 +143,6 @@ export default function NotesPage() {
             </Button>
           </div>
 
-          {/* Markdown editor */}
           <MarkdownEditor
             value={content}
             onChange={handleContentChange}
@@ -166,14 +154,10 @@ export default function NotesPage() {
           <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-muted">
             <FileText className="h-7 w-7 text-muted-foreground" />
           </div>
-          <p className="font-medium">No note selected</p>
-          <p className="text-sm text-muted-foreground">
-            Pick a note from the sidebar or create a new one
-          </p>
+          <p className="font-medium">Loading daily note…</p>
         </div>
       )}
 
-      {/* Delete confirmation */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

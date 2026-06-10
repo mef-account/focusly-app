@@ -11,6 +11,8 @@ export type TaskPriority = 'urgent' | 'high' | 'medium' | 'low' | 'none'
 
 export type Tag = 'work' | 'personal'
 
+export type NoteType = 'daily' | 'project' | 'task'
+
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
 export interface Profile {
@@ -151,9 +153,10 @@ export interface Note {
   user_id: string
   task_id: string | null
   project_id: string | null
+  note_type: NoteType
+  note_date: string | null
   title: string
   content: string
-  tag: Tag
   created_at: string
   updated_at: string
 }

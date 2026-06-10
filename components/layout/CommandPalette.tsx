@@ -29,7 +29,7 @@ const PAGES = [
   { label: 'Structure', href: '/app/projects', icon: FolderKanban },
   { label: 'My Tasks', href: '/app/my-tasks', icon: CheckSquare },
   { label: 'Planner', href: '/app/planner', icon: CalendarDays },
-  { label: 'Notes', href: '/app/notes', icon: FileText },
+  { label: 'Daily', href: '/app/notes', icon: FileText },
   { label: 'Views', href: '/app/views', icon: TableProperties },
   { label: 'Tracker', href: '/app/tracker', icon: Timer },
   { label: 'Reports', href: '/app/reports', icon: BarChart3 },
@@ -77,7 +77,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           </CommandItem>
           <CommandItem onSelect={() => run('/app/notes')}>
             <Plus className="mr-2 h-4 w-4" />
-            New note
+            Open daily note
           </CommandItem>
         </CommandGroup>
       </CommandList>

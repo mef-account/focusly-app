@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { toError } from '@/lib/supabase/errors'
@@ -6,18 +7,93 @@ import type { Note } from '@/types'
 
 const supabase = createClient()
 
-export function useNotes() {
+function todayStr() {
+  return format(new Date(), 'yyyy-MM-dd')
+}
+
+function todayTitle() {
+  return format(new Date(), 'EEEE, MMMM d')
+}
+
+export function useDailyNotes() {
   return useQuery({
-    queryKey: ['notes'],
+    queryKey: ['notes', 'daily'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('notes')
         .select('*')
-        .order('updated_at', { ascending: false })
+        .eq('note_type', 'daily')
+        .order('note_date', { ascending: false })
       if (error) throw toError(error)
       return data as Note[]
     },
   })
+}
+
+export function useTodayDailyNote() {
+  const today = todayStr()
+  return useQuery({
+    queryKey: ['notes', 'daily', today],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('note_type', 'daily')
+        .eq('note_date', today)
+        .maybeSingle()
+      if (error) throw toError(error)
+      return data as Note | null
+    },
+  })
+}
+
+export function useEnsureTodayDailyNote() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('You must be signed in.')
+
+      const today = todayStr()
+      const { data: existing, error: fetchError } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('note_type', 'daily')
+        .eq('note_date', today)
+        .maybeSingle()
+
+      if (fetchError) throw toError(fetchError)
+      if (existing) return existing as Note
+
+      const { data, error } = await supabase
+        .from('notes')
+        .insert({
+          user_id: user.id,
+          note_type: 'daily',
+          note_date: today,
+          title: todayTitle(),
+          content: '',
+          task_id: null,
+          project_id: null,
+        })
+        .select()
+        .single()
+
+      if (error) throw toError(error)
+      return data as Note
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notes', 'daily'] })
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Could not create daily note.')
+    },
+  })
+}
+
+/** @deprecated Use useDailyNotes for the journal page */
+export function useNotes() {
+  return useDailyNotes()
 }
 
 export function useNotesByTask(taskId?: string) {
@@ -27,6 +103,7 @@ export function useNotesByTask(taskId?: string) {
       const { data, error } = await supabase
         .from('notes')
         .select('*')
+        .eq('note_type', 'task')
         .eq('task_id', taskId!)
         .order('updated_at', { ascending: false })
       if (error) throw toError(error)
@@ -48,6 +125,7 @@ export function useNoteCountsByTask(taskIds: string[]) {
       const { data, error } = await supabase
         .from('notes')
         .select('task_id')
+        .eq('note_type', 'task')
         .in('task_id', sorted)
 
       if (error) throw toError(error)
@@ -69,6 +147,7 @@ export function useNotesByProject(projectId?: string) {
       const { data, error } = await supabase
         .from('notes')
         .select('*')
+        .eq('note_type', 'project')
         .eq('project_id', projectId!)
         .order('updated_at', { ascending: false })
       if (error) throw toError(error)
@@ -102,7 +181,15 @@ export function useCreateNote() {
       if (!user) throw new Error('You must be signed in to create a note.')
       const { data, error } = await supabase
         .from('notes')
-        .insert({ title: 'Untitled', content: '', tag: 'personal', ...note, user_id: user.id })
+        .insert({
+          title: 'Untitled',
+          content: '',
+          task_id: null,
+          project_id: null,
+          note_date: null,
+          ...note,
+          user_id: user.id,
+        })
         .select()
         .single()
       if (error) throw toError(error)
@@ -110,6 +197,9 @@ export function useCreateNote() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['notes'] })
+      if (data.note_type === 'daily') {
+        queryClient.invalidateQueries({ queryKey: ['notes', 'daily'] })
+      }
       if (data.project_id) {
         queryClient.invalidateQueries({ queryKey: ['notes', 'by-project', data.project_id] })
       }
@@ -132,17 +222,19 @@ export function useUpdateNote() {
       if (error) throw toError(error)
     },
     onMutate: async ({ id, ...updates }) => {
-      await queryClient.cancelQueries({ queryKey: ['notes'] })
-      const previous = queryClient.getQueryData(['notes'])
-      queryClient.setQueryData(['notes'], (old: Note[] | undefined) =>
+      await queryClient.cancelQueries({ queryKey: ['notes', 'daily'] })
+      const previous = queryClient.getQueryData(['notes', 'daily'])
+      queryClient.setQueryData(['notes', 'daily'], (old: Note[] | undefined) =>
         old?.map((n) => (n.id === id ? { ...n, ...updates } : n))
       )
       return { previous }
     },
     onError: (_err, _vars, ctx) => {
-      queryClient.setQueryData(['notes'], ctx?.previous)
+      queryClient.setQueryData(['notes', 'daily'], ctx?.previous)
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['notes'] }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['notes'] })
+    },
   })
 }
 

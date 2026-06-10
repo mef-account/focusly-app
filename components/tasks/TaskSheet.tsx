@@ -306,10 +306,10 @@ export function TaskSheet() {
   async function handleNewNote() {
     if (!task) return
     const note = await createNote.mutateAsync({
+      note_type: 'task',
       task_id: task.id,
       title: task.title,
       content: '',
-      tag: 'work',
     })
     openNote(note.id, { mode: 'edit' })
   }

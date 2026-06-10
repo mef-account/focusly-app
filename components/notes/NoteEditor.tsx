@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +16,6 @@ import {
 import { MarkdownEditor } from '@/components/notes/MarkdownEditor'
 import { useNote, useUpdateNote, useDeleteNote } from '@/lib/queries/useNotes'
 import { cn } from '@/lib/utils'
-import type { Tag } from '@/types'
 
 const DEBOUNCE_MS = 800
 
@@ -39,7 +37,6 @@ export function NoteEditor({ noteId, defaultMode = 'split', actions, onDeleted, 
 
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
-  const [tag, setTag] = useState<Tag>('personal')
   const [saving, setSaving] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
 
@@ -49,12 +46,11 @@ export function NoteEditor({ noteId, defaultMode = 'split', actions, onDeleted, 
     if (note) {
       setTitle(note.title)
       setContent(note.content)
-      setTag(note.tag)
     }
   }, [noteId, note?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveNow = useCallback(
-    (patch: { title?: string; content?: string; tag?: Tag }) => {
+    (patch: { title?: string; content?: string }) => {
       setSaving(true)
       updateNote.mutate(
         { id: noteId, ...patch },
@@ -67,17 +63,11 @@ export function NoteEditor({ noteId, defaultMode = 'split', actions, onDeleted, 
   function handleContentChange(val: string) {
     setContent(val)
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => saveNow({ content: val, title, tag }), DEBOUNCE_MS)
+    debounceRef.current = setTimeout(() => saveNow({ content: val, title }), DEBOUNCE_MS)
   }
 
   function handleTitleBlur() {
     if (title !== note?.title) saveNow({ title })
-  }
-
-  function cycleTag() {
-    const next: Tag = tag === 'personal' ? 'work' : 'personal'
-    setTag(next)
-    saveNow({ tag: next })
   }
 
   function handleDelete() {
@@ -96,7 +86,6 @@ export function NoteEditor({ noteId, defaultMode = 'split', actions, onDeleted, 
 
   return (
     <div className={cn('flex min-h-0 flex-1 flex-col', className)}>
-      {/* Header */}
       <div className="flex items-center gap-2 border-b px-4 py-2">
         <input
           spellCheck
@@ -106,17 +95,6 @@ export function NoteEditor({ noteId, defaultMode = 'split', actions, onDeleted, 
           onBlur={handleTitleBlur}
           placeholder="Untitled"
         />
-        <Badge
-          className={cn(
-            'cursor-pointer select-none text-xs capitalize transition-colors',
-            tag === 'work'
-              ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-              : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-          )}
-          onClick={cycleTag}
-        >
-          {tag}
-        </Badge>
         <span className="min-w-[52px] text-right text-[10px] text-muted-foreground">
           {saving ? 'Saving…' : 'Saved'}
         </span>

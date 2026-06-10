@@ -27,7 +27,7 @@ const NAV_ITEMS = [
   { label: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
   { label: 'Structure', href: '/app/projects', icon: FolderKanban },
   { label: 'Planner', href: '/app/planner', icon: CalendarDays },
-  { label: 'Notes', href: '/app/notes', icon: FileText },
+  { label: 'Daily', href: '/app/notes', icon: FileText },
   { label: 'Views', href: '/app/views', icon: TableProperties },
   { label: 'Tracker', href: '/app/tracker', icon: Timer },
   { label: 'Reports', href: '/app/reports', icon: BarChart3 },
