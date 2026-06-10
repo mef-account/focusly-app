@@ -602,8 +602,8 @@ function ViewsPageInner() {
             {/* Colgroup ensures all rows — header, group, task — use identical widths */}
             <colgroup>
               <col style={{ width: 24 }} />
-              {showCol('status')           && <col style={{ width: colW['status'] }} />}
               <col style={{ width: colW['title'] }} />
+              {showCol('status')           && <col style={{ width: colW['status'] }} />}
               {showCol('priority')         && <col style={{ width: colW['priority'] }} />}
               {showCol('assignee')         && <col style={{ width: colW['assignee'] }} />}
               {showCol('project')          && <col style={{ width: colW['project'] }} />}
@@ -617,8 +617,8 @@ function ViewsPageInner() {
             <thead className="sticky top-0 z-10 border-b bg-background">
               <tr>
                 <th style={{ width: 24 }} className="h-8 px-1 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground">#</th>
-                {showCol('status')           && <ColHeader label="Status"       col="status"           width={colW['status']}           onResize={startResize} center />}
                 <ColHeader label="Task" col="title" width={colW['title']} onResize={startResize} />
+                {showCol('status')           && <ColHeader label="Status"       col="status"           width={colW['status']}           onResize={startResize} center />}
                 {showCol('priority')         && <ColHeader label="Priority"     col="priority"         width={colW['priority']}         onResize={startResize} />}
                 {showCol('assignee')         && <ColHeader label="Assignee"     col="assignee"         width={colW['assignee']}         onResize={startResize} />}
                 {showCol('project')          && <ColHeader label="Project"      col="project"          width={colW['project']}          onResize={startResize} />}
@@ -663,7 +663,6 @@ function ViewsPageInner() {
                       onClick={toggleKey}
                     >
                       <td style={{ width: 24 }} className="h-7" />
-                      {showCol('status') && <td style={{ width: colW['status'] }} />}
                       <td style={{ width: colW['title'] }} className="h-7 px-2">
                         <span className={cn('flex items-center gap-2 text-sm font-semibold text-foreground', indent && 'pl-4')}>
                           {isCollapsed ? (
@@ -692,6 +691,7 @@ function ViewsPageInner() {
                           )}
                         </span>
                       </td>
+                      {showCol('status') && <td style={{ width: colW['status'] }} />}
                       {showCol('priority') && <td style={{ width: colW['priority'] }} />}
                       {showCol('assignee') && <td style={{ width: colW['assignee'] }} />}
                       {showCol('project') && <td style={{ width: colW['project'] }} />}
@@ -948,6 +948,16 @@ function TaskRow({
         {rowNum}
       </td>
 
+      {/* Title */}
+      <td style={{ width: colW['title'] }} className={cn(
+        'h-7 pr-2',
+        indent === 0 && 'pl-2',
+        indent === 1 && 'pl-5',
+        indent === 2 && 'pl-9',
+      )}>
+        <span className="truncate block text-[13px]">{task.title}</span>
+      </td>
+
       {/* Status — icon only */}
       {showStatus && (
         <td style={{ width: colW['status'] }} className="h-7 px-1 text-center" onClick={(e) => e.stopPropagation()}>
@@ -976,16 +986,6 @@ function TaskRow({
           </div>
         </td>
       )}
-
-      {/* Title */}
-      <td style={{ width: colW['title'] }} className={cn(
-        'h-7 pr-2',
-        indent === 0 && 'pl-2',
-        indent === 1 && 'pl-5',
-        indent === 2 && 'pl-9',
-      )}>
-        <span className="truncate block text-[13px]">{task.title}</span>
-      </td>
 
       {/* Priority */}
       {showPriority && (
