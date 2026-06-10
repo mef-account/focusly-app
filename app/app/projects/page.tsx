@@ -243,9 +243,10 @@ export default function ProjectsPage() {
 
   const isLoading = loadingProjects || loadingWorkspaces || loadingPortfolios
 
-  const activePortfolios = selectedWorkspaceId
+  const activePortfolios = (selectedWorkspaceId
     ? portfolios.filter((p) => p.workspace_id === selectedWorkspaceId)
     : portfolios
+  ).slice().sort((a, b) => a.name.localeCompare(b.name))
 
   const activeProjects = selectedWorkspaceId
     ? projects.filter((p) => {
