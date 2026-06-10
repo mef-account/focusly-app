@@ -620,7 +620,7 @@ function ViewsPageInner() {
           <table className="w-full table-fixed border-collapse text-[13px]">
             {/* Colgroup ensures all rows — header, group, task — use identical widths */}
             <colgroup>
-              <col style={{ width: 36 }} />
+              <col style={{ width: 24 }} />
               {showCol('status')           && <col style={{ width: colW['status'] }} />}
               <col style={{ width: colW['title'] }} />
               {showCol('priority')         && <col style={{ width: colW['priority'] }} />}
@@ -630,13 +630,13 @@ function ViewsPageInner() {
               {showCol('created_at')       && <col style={{ width: colW['created_at'] }} />}
               {showCol('estimate_minutes') && <col style={{ width: colW['estimate_minutes'] }} />}
               {showCol('logged')           && <col style={{ width: colW['logged'] }} />}
-              <col style={{ width: 44 }} />
+              <col style={{ width: 32 }} />
             </colgroup>
             {/* Column headers */}
             <thead className="sticky top-0 z-10 border-b bg-background">
               <tr>
-                <th style={{ width: 36 }} className="h-8 px-2 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground">#</th>
-                {showCol('status')           && <ColHeader label="Status"       col="status"           width={colW['status']}           onResize={startResize} />}
+                <th style={{ width: 24 }} className="h-8 px-1 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground">#</th>
+                {showCol('status')           && <ColHeader label="Status"       col="status"           width={colW['status']}           onResize={startResize} center />}
                 <ColHeader label="Task" col="title" width={colW['title']} onResize={startResize} />
                 {showCol('priority')         && <ColHeader label="Priority"     col="priority"         width={colW['priority']}         onResize={startResize} />}
                 {showCol('assignee')         && <ColHeader label="Assignee"     col="assignee"         width={colW['assignee']}         onResize={startResize} />}
@@ -645,8 +645,8 @@ function ViewsPageInner() {
                 {showCol('created_at')       && <ColHeader label="Created date" col="created_at"       width={colW['created_at']}       onResize={startResize} />}
                 {showCol('estimate_minutes') && <ColHeader label="Estimate"     col="estimate_minutes" width={colW['estimate_minutes']} onResize={startResize} />}
                 {showCol('logged')           && <ColHeader label="Logged"       col="logged"           width={colW['logged']}           onResize={startResize} />}
-                <th style={{ width: 44 }} className="h-7 px-2 text-center text-xs font-medium uppercase tracking-wide text-muted-foreground select-none whitespace-nowrap">Timer</th>
-                <th style={{ width: 44 }} className="h-8 px-2" />
+                <th style={{ width: 32 }} className="h-7 px-1 text-center text-xs font-medium uppercase tracking-wide text-muted-foreground select-none whitespace-nowrap">Timer</th>
+                <th style={{ width: 32 }} className="h-8 px-1" />
               </tr>
             </thead>
 
@@ -681,7 +681,7 @@ function ViewsPageInner() {
                       )}
                       onClick={toggleKey}
                     >
-                      <td style={{ width: 36 }} className="h-7" />
+                      <td style={{ width: 24 }} className="h-7" />
                       {showCol('status') && <td style={{ width: colW['status'] }} />}
                       <td style={{ width: colW['title'] }} className="h-7 px-4">
                         <span className={cn('flex items-center gap-2 text-sm font-semibold text-foreground', indent && 'pl-4')}>
@@ -722,7 +722,7 @@ function ViewsPageInner() {
                       {showCol('created_at') && <td style={{ width: colW['created_at'] }} />}
                       {showCol('estimate_minutes') && <td style={{ width: colW['estimate_minutes'] }} />}
                       {showCol('logged') && <td style={{ width: colW['logged'] }} />}
-                      <td style={{ width: 44 }} />
+                      <td style={{ width: 32 }} />
                     </tr>
                   )
                 }
@@ -824,16 +824,20 @@ function ViewsPageInner() {
 
 // ─── Col header with resize handle ───────────────────────────────────────────
 
-function ColHeader({ label, col, width, onResize }: {
+function ColHeader({ label, col, width, onResize, center }: {
   label: string
   col: string
   width: number
   onResize: (col: string, e: React.MouseEvent) => void
+  center?: boolean
 }) {
   return (
     <th
       style={{ width }}
-      className="group/th relative h-8 px-2 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground overflow-hidden"
+      className={cn(
+        'group/th relative h-8 px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground overflow-hidden',
+        center ? 'text-center' : 'text-left'
+      )}
     >
       <span className="truncate">{label}</span>
       <div
@@ -903,7 +907,7 @@ function TaskRow({
       onClick={onOpen}
     >
       {/* Row number */}
-      <td style={{ width: 36 }} className="h-7 px-2 text-center text-[11px] text-muted-foreground/50 select-none tabular-nums">
+      <td style={{ width: 24 }} className="h-7 px-1 text-center text-[11px] text-muted-foreground/50 select-none tabular-nums">
         {rowNum}
       </td>
 
@@ -1024,7 +1028,7 @@ function TaskRow({
       )}
 
       {/* Timer */}
-      <td style={{ width: 44 }} className="h-7 px-2" onClick={(e) => e.stopPropagation()}>
+      <td style={{ width: 32 }} className="h-7 px-1" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-center">
           <TaskTimerButton task={task} />
         </div>
