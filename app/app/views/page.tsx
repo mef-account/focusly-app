@@ -658,7 +658,7 @@ function ViewsPageInner() {
                       key={`hdr-${key}`}
                       className={cn(
                         'cursor-pointer select-none border-y border-border/60',
-                        indent ? 'bg-muted/50' : 'bg-muted'
+                        indent ? 'bg-muted/25' : 'bg-muted'
                       )}
                       onClick={toggleKey}
                     >
