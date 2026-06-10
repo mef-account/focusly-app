@@ -641,24 +641,23 @@ function ViewsPageInner() {
                     return next
                   })
 
-                const dueDates = group.tasks.map((t) => t.due_date).filter(Boolean) as string[]
-                const maxDue = dueDates.length ? dueDates.sort().reverse()[0] : null
-                const totalEstMins = group.tasks.reduce((s, t) => s + (t.estimate_minutes ?? 0), 0)
-                const totalLogSecs = group.tasks.reduce((s, t) => s + (timeTotals[t.id] ?? 0), 0)
-
-                const renderGroupHeader = (key: string, label: string, groupBy: ViewGroupBy, indent = false) => {
+                const renderGroupHeader = (key: string, label: string, groupBy: ViewGroupBy, headerTasks: Task[], indent = false) => {
                   const isCollapsed = collapsedGroups.has(key)
                   const toggleKey = () => setCollapsedGroups((prev) => {
                     const next = new Set(prev)
                     next.has(key) ? next.delete(key) : next.add(key)
                     return next
                   })
+                  const hDueDates = headerTasks.map((t) => t.due_date).filter(Boolean) as string[]
+                  const hMaxDue = hDueDates.length ? hDueDates.sort().reverse()[0] : null
+                  const hEstMins = headerTasks.reduce((s, t) => s + (t.estimate_minutes ?? 0), 0)
+                  const hLogSecs = headerTasks.reduce((s, t) => s + (timeTotals[t.id] ?? 0), 0)
                   return (
                     <tr
                       key={`hdr-${key}`}
                       className={cn(
                         'cursor-pointer select-none border-y border-border/60',
-                        indent ? 'bg-muted/25' : 'bg-muted'
+                        indent ? 'bg-muted/50' : 'bg-muted'
                       )}
                       onClick={toggleKey}
                     >
@@ -672,22 +671,18 @@ function ViewsPageInner() {
                           )}
                           <GroupIcon groupKey={key} groupBy={groupBy} />
                           {label}
-                          {!indent && (
-                            <>
-                              <span className="text-xs font-normal text-muted-foreground">
-                                {group.tasks.length}
-                              </span>
-                              {totalEstMins > 0 && (
-                                <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
-                                  · <Clock className="h-3 w-3" /> Est {formatMinutes(totalEstMins)}
-                                </span>
-                              )}
-                              {totalLogSecs > 0 && (
-                                <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
-                                  · <Clock className="h-3 w-3" /> Log {formatDuration(totalLogSecs)}
-                                </span>
-                              )}
-                            </>
+                          <span className="text-xs font-normal text-muted-foreground">
+                            {headerTasks.length}
+                          </span>
+                          {hEstMins > 0 && (
+                            <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                              · <Clock className="h-3 w-3" /> Est {formatMinutes(hEstMins)}
+                            </span>
+                          )}
+                          {hLogSecs > 0 && (
+                            <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                              · <Clock className="h-3 w-3" /> Log {formatDuration(hLogSecs)}
+                            </span>
                           )}
                         </span>
                       </td>
@@ -697,7 +692,7 @@ function ViewsPageInner() {
                       {showCol('project') && <td style={{ width: colW['project'] }} />}
                       {showCol('due_date') && (
                         <td style={{ width: colW['due_date'] }} className="h-7 px-2 text-xs text-muted-foreground tabular-nums">
-                          {!indent && maxDue ? formatDate(maxDue) : ''}
+                          {hMaxDue ? formatDate(hMaxDue) : ''}
                         </td>
                       )}
                       {showCol('created_at') && <td style={{ width: colW['created_at'] }} />}
@@ -711,7 +706,7 @@ function ViewsPageInner() {
                 return (
                   <React.Fragment key={group.key}>
                     {/* Group header row */}
-                    {display.groupBy !== 'none' && renderGroupHeader(group.key, group.label, display.groupBy)}
+                    {display.groupBy !== 'none' && renderGroupHeader(group.key, group.label, display.groupBy, group.tasks)}
 
                     {!collapsed && (
                       group.subGroups ? (
@@ -720,7 +715,7 @@ function ViewsPageInner() {
                           const subCollapsed = collapsedGroups.has(`sub-${sub.key}`)
                           return (
                             <React.Fragment key={`sub-${sub.key}`}>
-                              {renderGroupHeader(`sub-${sub.key}`, sub.label, display.subGroupBy, true)}
+                              {renderGroupHeader(`sub-${sub.key}`, sub.label, display.subGroupBy, sub.tasks, true)}
                               {!subCollapsed && sub.tasks.map((task, idx) => (
                                 <TaskRow
                                   key={task.id}
