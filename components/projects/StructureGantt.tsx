@@ -45,6 +45,41 @@ interface GanttColumn {
   label: string
 }
 
+interface WeekBand {
+  key: string
+  weekNum: number
+  width: number
+}
+
+function buildWeekBands(columns: GanttColumn[]): WeekBand[] {
+  const bands: WeekBand[] = []
+  let currentWeek: number | null = null
+  let currentWidth = 0
+  let currentKey = ''
+
+  for (const col of columns) {
+    const weekNum = getWeek(col.date, { weekStartsOn: 1 })
+    const key = `${format(col.date, 'yyyy')}-W${weekNum}`
+
+    if (weekNum !== currentWeek) {
+      if (currentWeek !== null) {
+        bands.push({ key: currentKey, weekNum: currentWeek, width: currentWidth })
+      }
+      currentWeek = weekNum
+      currentWidth = col.width
+      currentKey = key
+    } else {
+      currentWidth += col.width
+    }
+  }
+
+  if (currentWeek !== null) {
+    bands.push({ key: currentKey, weekNum: currentWeek, width: currentWidth })
+  }
+
+  return bands
+}
+
 function buildColumns(
   scale: GanttScale,
   windowStart: Date,
@@ -59,7 +94,7 @@ function buildColumns(
   switch (scale) {
     case 'day':
       intervals = eachDayOfInterval({ start: windowStart, end: windowEnd })
-      labelFn = (d) => format(d, 'EEE d')
+      labelFn = (d) => format(d, 'd')
       break
     case 'week':
       intervals = eachWeekOfInterval(
@@ -184,6 +219,11 @@ export function StructureGantt({ rows, windowStart, windowEnd }: StructureGanttP
     [windowStart, windowEnd, timelineWidth],
   )
 
+  const weekBands = useMemo(
+    () => (scale === 'day' ? buildWeekBands(columns) : []),
+    [scale, columns],
+  )
+
   const handleDragStart = useCallback((clientX: number) => {
     const el = scrollRef.current
     if (!el) return
@@ -289,18 +329,46 @@ export function StructureGantt({ rows, windowStart, windowEnd }: StructureGanttP
           )}
 
           {/* Column headers */}
-          <div className={cn(ROW_H, 'flex border-b sticky top-0 bg-background z-10')}>
-            {columns.map((col) => (
-              <div
-                key={col.date.toISOString()}
-                className="shrink-0 border-r border-border/40 px-1.5 flex items-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground truncate"
-                style={{ width: col.width }}
-                title={col.label}
-              >
-                {col.label}
+          {scale === 'day' ? (
+            <div className={cn(ROW_H, 'sticky top-0 z-10 flex flex-col border-b bg-background')}>
+              <div className="flex h-4 border-b border-border/40">
+                {weekBands.map((band) => (
+                  <div
+                    key={band.key}
+                    className="shrink-0 flex items-center justify-center border-r border-border/40 bg-muted/30 text-[10px] font-semibold tabular-nums text-muted-foreground"
+                    style={{ width: band.width }}
+                  >
+                    W{band.weekNum}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+              <div className="flex h-5">
+                {columns.map((col) => (
+                  <div
+                    key={col.date.toISOString()}
+                    className="shrink-0 border-r border-border/40 flex items-center justify-center text-[10px] font-medium tabular-nums text-muted-foreground"
+                    style={{ width: col.width }}
+                    title={format(col.date, 'EEE, MMM d')}
+                  >
+                    {col.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className={cn(ROW_H, 'flex border-b sticky top-0 bg-background z-10')}>
+              {columns.map((col) => (
+                <div
+                  key={col.date.toISOString()}
+                  className="shrink-0 border-r border-border/40 px-1.5 flex items-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground truncate"
+                  style={{ width: col.width }}
+                  title={col.label}
+                >
+                  {col.label}
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Rows */}
           {rows.map((row, i) => {
