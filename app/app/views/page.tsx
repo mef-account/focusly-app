@@ -283,7 +283,7 @@ function ViewsPageInner() {
       setFilters(viewFiltersToActive(activeView.filters as { field: string; operator: string; value: unknown }[]))
       setDisplay({
         groupBy: activeView.group_by ?? 'status',
-        subGroupBy: 'none',
+        subGroupBy: ((activeView.group_config as Record<string, unknown>)?.sub_group_by as ViewGroupBy) ?? 'none',
         sortField: (activeView.sort?.column as DisplayOptions['sortField']) ?? 'priority',
         sortDir: (activeView.sort?.direction as 'asc' | 'desc') ?? 'asc',
         visibleColumns: (activeView.visible_columns ?? DEFAULT_DISPLAY.visibleColumns) as ColumnId[],
@@ -429,7 +429,7 @@ function ViewsPageInner() {
       name: saveName.trim(),
       filters: filtersToViewFilters(filters),
       group_by: display.groupBy,
-      group_config: {},
+      group_config: { sub_group_by: display.subGroupBy },
       visible_columns: display.visibleColumns,
       sort: { column: display.sortField, direction: display.sortDir },
       project_ids: null,
@@ -449,6 +449,7 @@ function ViewsPageInner() {
       name: viewName,
       filters: filtersToViewFilters(filters),
       group_by: display.groupBy,
+      group_config: { sub_group_by: display.subGroupBy },
       visible_columns: display.visibleColumns,
       sort: { column: display.sortField, direction: display.sortDir },
     })
