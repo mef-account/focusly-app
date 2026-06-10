@@ -1,22 +1,28 @@
 'use client'
 
+import { useMemo } from 'react'
 import { CalendarClock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PriorityIcon } from '@/components/tasks/PriorityIcon'
-import { useTasksDueThisWeek } from '@/lib/queries/useTasks'
-import { taskDueDateLabel, formatMinutes } from '@/lib/utils'
+import { useTasksDueTomorrow } from '@/lib/queries/useTasks'
+import { taskDueDateLabel, formatMinutes, sortTasksByPriority } from '@/lib/utils'
 
 const DEFAULT_DUR = 30
 
 export function UpcomingWidget() {
-  const { data: tasks, isLoading } = useTasksDueThisWeek()
+  const { data: tasks, isLoading } = useTasksDueTomorrow()
+
+  const sortedTasks = useMemo(
+    () => (tasks ? sortTasksByPriority(tasks) : []),
+    [tasks]
+  )
 
   return (
     <div className="rounded-xl border bg-card p-5">
       <div className="mb-3 flex items-center gap-2">
         <CalendarClock className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-semibold">Upcoming (7 days)</h3>
+        <h3 className="text-sm font-semibold">Tomorrow</h3>
         {tasks && (
           <Badge variant="secondary" className="ml-auto text-xs">
             {tasks.length}
@@ -30,13 +36,13 @@ export function UpcomingWidget() {
             <Skeleton key={i} className="h-7 w-full" />
           ))}
         </div>
-      ) : !tasks?.length ? (
+      ) : !sortedTasks.length ? (
         <p className="py-4 text-center text-sm text-muted-foreground">
-          Clear week ahead ✨
+          Nothing due tomorrow ✨
         </p>
       ) : (
         <div className="space-y-1">
-          {tasks.slice(0, 8).map((task) => {
+          {sortedTasks.map((task) => {
             const { label } = taskDueDateLabel(task.due_date!)
             return (
               <div key={task.id} className="flex items-center gap-2 py-1">
@@ -51,11 +57,6 @@ export function UpcomingWidget() {
               </div>
             )
           })}
-          {tasks.length > 8 && (
-            <p className="pt-1 text-xs text-muted-foreground">
-              +{tasks.length - 8} more
-            </p>
-          )}
         </div>
       )}
     </div>

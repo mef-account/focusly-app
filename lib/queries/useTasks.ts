@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { format } from 'date-fns'
+import { format, addDays } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { toError } from '@/lib/supabase/errors'
 import { toast } from 'sonner'
@@ -82,23 +82,16 @@ export function useTasksActiveToday() {
   })
 }
 
-export function useTasksDueThisWeek() {
+export function useTasksDueTomorrow() {
   return useQuery({
-    queryKey: ['tasks', 'due-this-week'],
+    queryKey: ['tasks', 'due-tomorrow'],
     queryFn: async () => {
-      const today = new Date()
-      const tomorrow = new Date(today)
-      tomorrow.setDate(today.getDate() + 1)
-      const tomorrowStr = format(tomorrow, 'yyyy-MM-dd')
-      const in7Days = new Date(today)
-      in7Days.setDate(today.getDate() + 7)
-      const in7DaysStr = format(in7Days, 'yyyy-MM-dd')
+      const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd')
 
       const { data, error } = await supabase
         .from('tasks')
         .select('*, project:projects(id,name,color)')
-        .gte('due_date', tomorrowStr)
-        .lte('due_date', in7DaysStr)
+        .eq('due_date', tomorrow)
         .not('status', 'in', '("done","cancelled")')
         .order('due_date', { ascending: true })
       if (error) throw error
