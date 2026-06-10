@@ -283,7 +283,7 @@ export function StructureGantt({ rows, windowStart, windowEnd }: StructureGanttP
           {/* Today marker spans header + rows */}
           {todayLeftPx !== null && (
             <div
-              className="absolute inset-y-0 z-20 w-px bg-red-800 pointer-events-none"
+              className="absolute inset-y-0 z-20 w-px bg-red-950 pointer-events-none"
               style={{ left: todayLeftPx }}
             />
           )}
