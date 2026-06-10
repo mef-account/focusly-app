@@ -38,8 +38,8 @@ import { formatMinutes, formatDuration, cn } from '@/lib/utils'
 import type { Task } from '@/types'
 
 // ─── Time grid config ─────────────────────────────────────────────────────────
-const START_MIN = 7 * 60   // 07:00
-const END_MIN   = 22 * 60  // 22:00
+const START_MIN = 0        // 00:00
+const END_MIN   = 24 * 60  // 24:00 (exclusive)
 const PX_PER_SLOT = 34     // px height per slot at base zoom
 const DEFAULT_DUR = 30     // assumed minutes for tasks without an estimate
 const DEFAULT_START_MIN = 9 * 60 // 09:00 — default position for tasks without a time
