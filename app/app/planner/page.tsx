@@ -40,7 +40,7 @@ import type { Task } from '@/types'
 // ─── Time grid config ─────────────────────────────────────────────────────────
 const START_MIN = 0        // 00:00
 const END_MIN   = 24 * 60  // 24:00 (exclusive)
-const DEFAULT_VIEW_MIN = 7 * 60 // 07:00 — initial scroll position in day panel
+const DEFAULT_VIEW_MIN = 6 * 60 + 30 // 06:30 — initial scroll position in day panel
 const PX_PER_SLOT = 34     // px height per slot at base zoom
 const DEFAULT_DUR = 30     // assumed minutes for tasks without an estimate
 const DEFAULT_START_MIN = 9 * 60 // 09:00 — default position for tasks without a time
@@ -597,7 +597,7 @@ export default function PlannerPage() {
   const slotHeight    = slotMinutes * pxPerMinute
   const dayHeight     = slots.length * slotHeight
 
-  // Day panel: full 24h grid, but default scroll starts at 07:00
+  // Day panel: full 24h grid, but default scroll starts at 06:30
   useEffect(() => {
     const el = gridScrollRef.current
     if (!el) return
