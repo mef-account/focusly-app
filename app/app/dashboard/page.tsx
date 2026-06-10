@@ -18,7 +18,7 @@ export default function DashboardPage() {
           row 1 (auto)  : Timer | Progress | Note (row-span-2)
           row 2 (1fr)   : Tasks | Tomorrow  | ↑
       */}
-      <div className="grid flex-1 grid-cols-3 grid-rows-[auto_1fr] gap-4 overflow-hidden pb-6">
+      <div className="grid flex-1 grid-cols-3 grid-rows-[auto_1fr] gap-4 overflow-hidden pb-[88px]">
         {/* Row 1, Col 1 */}
         <TimerWidget />
 
