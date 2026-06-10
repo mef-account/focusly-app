@@ -50,7 +50,7 @@ export function DailyNoteWidget() {
   const isLoading = ensureToday.isPending && !noteId
 
   return (
-    <div className="flex h-full flex-col bg-card">
+    <div className="flex h-full flex-col rounded-xl border bg-card overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-2.5">
         <span className="text-sm font-semibold truncate">{title || 'Daily Note'}</span>
