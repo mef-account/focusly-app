@@ -74,6 +74,22 @@ export const useTimerStore = create<TimerStore>()(
       setTaskId: (taskId) => set({ taskId }),
       setTag: (tag) => set({ tag }),
     }),
-    { name: 'focusly-timer' }
+    {
+      name: 'focusly-timer',
+      // Never resume a running timer after refresh — only persist idle metadata
+      partialize: (state) => ({
+        description: state.description,
+        projectId: state.projectId,
+        taskId: state.taskId,
+        tag: state.tag,
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return
+        // Clear any running session restored from older persisted state
+        state.running = false
+        state.seconds = 0
+        state.startedAt = null
+      },
+    }
   )
 )
