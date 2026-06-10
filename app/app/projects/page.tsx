@@ -186,7 +186,7 @@ function WorkspaceTab({
 
   return (
     <>
-      <div className="flex items-center gap-0.5">
+      <div className="group/wstab flex items-center gap-0.5">
         <button
           onClick={onSelect}
           className={cn(
@@ -201,7 +201,7 @@ function WorkspaceTab({
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <button className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors" />
+              <button className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground opacity-0 group-hover/wstab:opacity-100 hover:bg-accent hover:text-foreground transition-all" />
             }
           >
             <MoreHorizontal className="h-3 w-3" />
