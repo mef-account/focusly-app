@@ -30,13 +30,13 @@ export function useTasksDueToday() {
   return useQuery({
     queryKey: ['tasks', 'due-today'],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0]
+      const today = format(new Date(), 'yyyy-MM-dd')
       const { data, error } = await supabase
         .from('tasks')
         .select('*, project:projects(id,name,color), assignee:profiles!assignee_id(id,name,avatar_url)')
-        .eq('due_date', today)
+        .lte('due_date', today)
         .not('status', 'in', '("done","cancelled")')
-        .order('priority', { ascending: true })
+        .order('due_date', { ascending: true })
       if (error) throw error
       return data as Task[]
     },
@@ -48,7 +48,7 @@ export function useTasksActiveToday() {
   return useQuery({
     queryKey: ['tasks', 'active-today'],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0]
+      const today = format(new Date(), 'yyyy-MM-dd')
       const todayEnd = `${today}T23:59:59`
 
       const SELECT = '*, project:projects(id,name,color), assignee:profiles!assignee_id(id,name,avatar_url)'
