@@ -40,6 +40,7 @@ import type { Task } from '@/types'
 // ─── Time grid config ─────────────────────────────────────────────────────────
 const START_MIN = 0        // 00:00
 const END_MIN   = 24 * 60  // 24:00 (exclusive)
+const DEFAULT_VIEW_MIN = 7 * 60 // 07:00 — initial scroll position in day panel
 const PX_PER_SLOT = 34     // px height per slot at base zoom
 const DEFAULT_DUR = 30     // assumed minutes for tasks without an estimate
 const DEFAULT_START_MIN = 9 * 60 // 09:00 — default position for tasks without a time
@@ -595,6 +596,21 @@ export default function PlannerPage() {
   const pxPerMinute   = Math.max(basePxPerMin, floorPxPerMin)
   const slotHeight    = slotMinutes * pxPerMinute
   const dayHeight     = slots.length * slotHeight
+
+  // Day panel: full 24h grid, but default scroll starts at 07:00
+  useEffect(() => {
+    const el = gridScrollRef.current
+    if (!el) return
+    const scrollToDefaultView = () => {
+      const covered = slots.length * slotMinutes
+      const basePpm = PX_PER_SLOT / slotMinutes
+      const floorPpm = el.clientHeight > 0 ? el.clientHeight / covered : 0
+      const ppm = Math.max(basePpm, floorPpm)
+      el.scrollTop = DEFAULT_VIEW_MIN * ppm
+    }
+    scrollToDefaultView()
+    requestAnimationFrame(scrollToDefaultView)
+  }, [selectedDay, slotMinutes, slots.length])
 
   const toggleDay = (i: number) => {
     setVisibleDayIndices((prev) => {
