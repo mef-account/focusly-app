@@ -40,7 +40,7 @@ export function TodaysTasksWidget() {
   )
 
   return (
-    <div className="rounded-xl border bg-card p-5">
+    <div className="flex h-full flex-col rounded-xl border bg-card p-5">
       <div className="mb-3 flex items-center gap-2">
         <CheckSquare className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-semibold">Today&apos;s Tasks</h3>

@@ -40,7 +40,7 @@ export function DailyProgressWidget() {
   const isLoading = loadingTasks || loadingEntries
 
   return (
-    <div className="flex h-full flex-col rounded-xl border bg-card p-5">
+    <div className="flex flex-col rounded-xl border bg-card p-5">
       <div className="mb-4 flex items-center gap-2">
         <TrendingUp className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-semibold">Today&apos;s Progress</h3>

@@ -22,7 +22,7 @@ export function TimerWidget() {
   }, [running, tick])
 
   return (
-    <div className="flex h-full items-center justify-between rounded-xl border bg-card p-5">
+    <div className="flex items-center justify-between rounded-xl border bg-card p-5">
       <div className="flex items-center gap-3">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
           <Timer className="h-4 w-4 text-primary" />

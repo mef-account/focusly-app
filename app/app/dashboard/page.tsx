@@ -15,20 +15,24 @@ export default function DashboardPage() {
 
       {/* 3 equal columns */}
       <div className="grid flex-1 grid-cols-3 gap-4 overflow-hidden pb-6">
-        {/* Col 1: Timer + Today's Tasks */}
-        <div className="flex flex-col gap-4 overflow-y-auto">
+        {/* Col 1: Timer (compact) → Today's Tasks (fills rest) */}
+        <div className="flex min-h-0 flex-col gap-4">
           <TimerWidget />
-          <TodaysTasksWidget />
+          <div className="min-h-0 flex-1">
+            <TodaysTasksWidget />
+          </div>
         </div>
 
-        {/* Col 2: Today's Progress + Tomorrow */}
-        <div className="flex flex-col gap-4 overflow-y-auto">
+        {/* Col 2: Today's Progress (compact) → Tomorrow (fills rest) */}
+        <div className="flex min-h-0 flex-col gap-4">
           <DailyProgressWidget />
-          <UpcomingWidget />
+          <div className="min-h-0 flex-1">
+            <UpcomingWidget />
+          </div>
         </div>
 
-        {/* Col 3: Daily Note */}
-        <div className="flex flex-col overflow-hidden">
+        {/* Col 3: Daily Note (full height) */}
+        <div className="flex min-h-0 flex-col overflow-hidden">
           <DailyNoteWidget />
         </div>
       </div>
