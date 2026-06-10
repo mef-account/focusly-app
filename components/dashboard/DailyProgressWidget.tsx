@@ -39,11 +39,6 @@ export function DailyProgressWidget() {
 
   const isLoading = loadingTasks || loadingEntries
 
-  const progressPct =
-    totalEstMins > 0
-      ? Math.min(100, Math.round((totalLogSecs / 60 / totalEstMins) * 100))
-      : null
-
   return (
     <div className="rounded-xl border bg-card p-5">
       <div className="mb-4 flex items-center gap-2">
@@ -55,7 +50,6 @@ export function DailyProgressWidget() {
         <div className="flex gap-4">
           <Skeleton className="h-10 w-32" />
           <Skeleton className="h-10 w-32" />
-          <Skeleton className="h-10 flex-1" />
         </div>
       ) : (
         <div className="flex items-center gap-6">
@@ -86,25 +80,6 @@ export function DailyProgressWidget() {
               </p>
             </div>
           </div>
-
-          {/* Progress bar */}
-          {progressPct !== null && (
-            <>
-              <div className="h-10 w-px bg-border" />
-              <div className="flex flex-1 flex-col gap-1.5">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Progress</span>
-                  <span className="font-medium">{progressPct}%</span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all duration-500"
-                    style={{ width: `${progressPct}%` }}
-                  />
-                </div>
-              </div>
-            </>
-          )}
         </div>
       )}
     </div>
