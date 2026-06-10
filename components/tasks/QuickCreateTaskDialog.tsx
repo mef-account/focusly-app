@@ -154,6 +154,28 @@ export function QuickCreateTaskDialog() {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {/* Assignee */}
+          <AssigneePicker
+            value={assigneeId}
+            assignee={null}
+            onChange={setAssigneeId}
+            variant="compact"
+          />
+
+          {/* Estimate */}
+          <div className="flex items-center gap-1 rounded-md border border-input px-1.5 py-0.5">
+            <Clock className="h-3 w-3 text-muted-foreground" />
+            <input
+              className="w-14 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+              placeholder="Estimate"
+              value={estimateInput}
+              onChange={(e) => setEstimateInput(e.target.value)}
+            />
+            {estimateMinutes !== null && (
+              <span className="text-[10px] text-muted-foreground">{formatMinutes(estimateMinutes)}</span>
+            )}
+          </div>
+
           {/* Priority */}
           <DropdownMenu>
             <DropdownMenuTrigger render={
@@ -173,14 +195,6 @@ export function QuickCreateTaskDialog() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* Assignee */}
-          <AssigneePicker
-            value={assigneeId}
-            assignee={null}
-            onChange={setAssigneeId}
-            variant="compact"
-          />
 
           {/* Project */}
           <DropdownMenu>
@@ -216,20 +230,6 @@ export function QuickCreateTaskDialog() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* Estimate */}
-          <div className="flex items-center gap-1 rounded-md border border-input px-1.5 py-0.5">
-            <Clock className="h-3 w-3 text-muted-foreground" />
-            <input
-              className="w-14 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-              placeholder="Estimate"
-              value={estimateInput}
-              onChange={(e) => setEstimateInput(e.target.value)}
-            />
-            {estimateMinutes !== null && (
-              <span className="text-[10px] text-muted-foreground">{formatMinutes(estimateMinutes)}</span>
-            )}
-          </div>
 
           {/* Due date */}
           <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
