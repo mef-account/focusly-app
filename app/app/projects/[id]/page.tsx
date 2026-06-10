@@ -51,15 +51,19 @@ export default function ProjectDetailPage({ params }: PageProps) {
   }, [project])
 
   async function handleNewNote() {
-    if (!project) return
-    const note = await createNote.mutateAsync({
-      project_id: id,
-      task_id: null,
-      title: project.name,
-      content: '',
-      tag: 'work',
-    })
-    openNote(note.id, { mode: 'edit' })
+    if (!project || createNote.isPending) return
+    try {
+      const note = await createNote.mutateAsync({
+        project_id: id,
+        task_id: null,
+        title: project.name,
+        content: '',
+        tag: 'work',
+      })
+      openNote(note.id, { mode: 'edit' })
+    } catch {
+      // Error toast is shown by useCreateNote
+    }
   }
 
   if (projLoading) {

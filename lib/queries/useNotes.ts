@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { toError } from '@/lib/supabase/errors'
 import type { Note } from '@/types'
@@ -98,15 +99,28 @@ export function useCreateNote() {
   return useMutation({
     mutationFn: async (note: Partial<Note>) => {
       const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('You must be signed in to create a note.')
       const { data, error } = await supabase
         .from('notes')
-        .insert({ title: 'Untitled', content: '', tag: 'personal', ...note, user_id: user!.id })
+        .insert({ title: 'Untitled', content: '', tag: 'personal', ...note, user_id: user.id })
         .select()
         .single()
       if (error) throw toError(error)
       return data as Note
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes'] }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['notes'] })
+      if (data.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['notes', 'by-project', data.project_id] })
+      }
+      if (data.task_id) {
+        queryClient.invalidateQueries({ queryKey: ['notes', 'by-task', data.task_id] })
+        queryClient.invalidateQueries({ queryKey: ['notes', 'counts-by-task'] })
+      }
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Could not create note.')
+    },
   })
 }
 
