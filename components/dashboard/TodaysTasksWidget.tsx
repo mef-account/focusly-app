@@ -1,49 +1,26 @@
 'use client'
 
 import { useMemo } from 'react'
-import { CheckSquare, Circle, CheckCircle2 } from 'lucide-react'
+import { CheckSquare } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PriorityIcon } from '@/components/tasks/PriorityIcon'
-import { useTasksDueToday, useUpdateTask } from '@/lib/queries/useTasks'
-import { taskDueDateLabel, sortTasksByPriority, cn } from '@/lib/utils'
+import { useTasksDueToday } from '@/lib/queries/useTasks'
+import { taskDueDateLabel, sortTasksByPriority } from '@/lib/utils'
 import type { Task } from '@/types'
 
 function TaskRow({ task }: { task: Task }) {
-  const update = useUpdateTask()
-  const isDone = task.status === 'done'
   const dueLabel = task.due_date ? taskDueDateLabel(task.due_date) : null
 
   return (
     <div className="flex items-center gap-2 py-2">
-      <button
-        className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
-        onClick={() =>
-          update.mutate({ id: task.id, status: isDone ? 'todo' : 'done' })
-        }
-      >
-        {isDone ? (
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
-        ) : (
-          <Circle className="h-4 w-4" />
-        )}
-      </button>
-
-      <PriorityIcon priority={task.priority} />
-
-      <span className={cn('min-w-0 flex-1 truncate text-sm', isDone && 'line-through text-muted-foreground')}>
-        {task.title}
-      </span>
+      <span className="min-w-0 flex-1 truncate text-sm">{task.title}</span>
 
       {dueLabel && (
-        <span
-          className={cn(
-            'shrink-0 text-xs font-medium',
-            dueLabel.urgent ? 'text-amber-600' : 'text-muted-foreground'
-          )}
-        >
-          {dueLabel.label}
-        </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">{dueLabel.label}</span>
+          <PriorityIcon priority={task.priority} />
+        </div>
       )}
     </div>
   )

@@ -3,8 +3,9 @@
 import { CalendarClock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PriorityIcon } from '@/components/tasks/PriorityIcon'
 import { useTasksDueThisWeek } from '@/lib/queries/useTasks'
-import { taskDueDateLabel, cn } from '@/lib/utils'
+import { taskDueDateLabel } from '@/lib/utils'
 
 export function UpcomingWidget() {
   const { data: tasks, isLoading } = useTasksDueThisWeek()
@@ -34,26 +35,14 @@ export function UpcomingWidget() {
       ) : (
         <div className="space-y-1">
           {tasks.slice(0, 8).map((task) => {
-            const { label, urgent } = taskDueDateLabel(task.due_date!)
+            const { label } = taskDueDateLabel(task.due_date!)
             return (
               <div key={task.id} className="flex items-center justify-between gap-2 py-1">
-                <div className="flex items-center gap-2 min-w-0">
-                  {task.project && (
-                    <span
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: task.project.color }}
-                    />
-                  )}
-                  <span className="truncate text-sm">{task.title}</span>
+                <span className="min-w-0 truncate text-sm">{task.title}</span>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                  <PriorityIcon priority={task.priority} />
                 </div>
-                <span
-                  className={cn(
-                    'shrink-0 text-xs font-medium',
-                    urgent ? 'text-amber-600' : 'text-muted-foreground'
-                  )}
-                >
-                  {label}
-                </span>
               </div>
             )
           })}
