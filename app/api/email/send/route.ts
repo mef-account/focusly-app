@@ -3,7 +3,6 @@ import { Resend } from 'resend'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
 const DOMAIN = process.env.RESEND_RECEIVING_DOMAIN ?? 'task.codicocorp.com'
 
 /** Build email address: PER-1@task.codicocorp.com */
@@ -20,6 +19,7 @@ function taskEmailAddress(
 
 export async function POST(req: NextRequest) {
   try {
+    const resend = new Resend(process.env.RESEND_API_KEY)
     const { taskId, to, subject, body } = await req.json() as {
       taskId: string
       to: string[]
