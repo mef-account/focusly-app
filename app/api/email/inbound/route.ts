@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
 
   const { data: taskRow } = await admin
     .from('tasks')
-    .select('id')
+    .select('id, task_email')
     .in('workspace_id', workspaceIds)
     .eq('task_number', taskNumber)
     .maybeSingle()
@@ -102,6 +102,14 @@ export async function POST(req: NextRequest) {
   if (!taskId) {
     console.warn('[email/inbound] No task found for address:', bareAddress)
     return NextResponse.json({ ok: true }) // Acknowledge to Resend, just don't create comment
+  }
+
+  // 6b. Persist task_email on the task row if not already set
+  if (!taskRow?.task_email) {
+    await admin
+      .from('tasks')
+      .update({ task_email: bareAddress })
+      .eq('id', taskId)
   }
 
   // 7. Clean the email body
