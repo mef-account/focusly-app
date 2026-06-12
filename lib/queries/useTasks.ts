@@ -13,7 +13,7 @@ export function useTasks(projectId?: string) {
     queryFn: async () => {
       let q = supabase
         .from('tasks')
-        .select('*, project:projects(id,name,color,workspace_id,portfolio_id), assignee:profiles!assignee_id(id,name,avatar_url), labels(id,name,color)')
+        .select('*, project:projects(id,name,color,workspace_id,portfolio_id), workspace:workspaces(id,name,identifier), assignee:profiles!assignee_id(id,name,avatar_url), labels(id,name,color)')
         .is('parent_task_id', null)
         .order('created_at', { ascending: false })
 

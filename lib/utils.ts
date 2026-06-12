@@ -9,7 +9,7 @@ import {
   format,
   parseISO,
 } from 'date-fns'
-import type { DueDateBucket, TaskStatus, TaskPriority } from '@/types'
+import type { DueDateBucket, Task, TaskStatus, TaskPriority } from '@/types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -155,4 +155,17 @@ export const PRIORITY_LABELS: Record<TaskPriority, string> = {
   medium: 'Medium',
   low: 'Low',
   none: 'No priority',
+}
+
+// ─── Task identifier key (e.g. MUR-4) ────────────────────────────────────────
+
+export function getTaskKey(task: Pick<Task, 'task_number' | 'workspace'>): string | null {
+  const identifier = task.workspace?.identifier ?? null
+  return identifier && task.task_number != null ? `${identifier}-${task.task_number}` : null
+}
+
+/** Auto-suggest a 3-letter identifier from a workspace name */
+export function suggestIdentifier(name: string): string {
+  const letters = name.replace(/[^a-zA-Z]/g, '').toUpperCase()
+  return letters.slice(0, 3)
 }

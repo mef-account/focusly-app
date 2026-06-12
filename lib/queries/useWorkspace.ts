@@ -41,7 +41,7 @@ export function useWorkspaces() {
 export function useCreateWorkspace() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (workspace: { name: string; type?: 'personal' | 'work' }) => {
+    mutationFn: async (workspace: { name: string; identifier?: string; type?: 'personal' | 'work' }) => {
       const { data: { user } } = await supabase.auth.getUser()
       const { data, error } = await supabase
         .from('workspaces')
@@ -61,7 +61,7 @@ export function useCreateWorkspace() {
 export function useUpdateWorkspace() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; name?: string; type?: 'personal' | 'work' }) => {
+    mutationFn: async ({ id, ...updates }: { id: string; name?: string; identifier?: string; type?: 'personal' | 'work' }) => {
       const { error } = await supabase.from('workspaces').update(updates).eq('id', id)
       if (error) throw error
     },

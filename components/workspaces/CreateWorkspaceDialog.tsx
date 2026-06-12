@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { useCreateWorkspace } from '@/lib/queries/useWorkspace'
+import { suggestIdentifier } from '@/lib/utils'
 
 interface CreateWorkspaceDialogProps {
   open: boolean
@@ -21,15 +22,35 @@ interface CreateWorkspaceDialogProps {
 export function CreateWorkspaceDialog({ open, onOpenChange }: CreateWorkspaceDialogProps) {
   const createWorkspace = useCreateWorkspace()
   const [name, setName] = useState('')
+  const [identifier, setIdentifier] = useState('')
+  const [identifierTouched, setIdentifierTouched] = useState(false)
   const [type, setType] = useState<'personal' | 'work'>('work')
+
+  // Auto-suggest identifier from name until user manually edits it
+  useEffect(() => {
+    if (!identifierTouched) {
+      setIdentifier(suggestIdentifier(name))
+    }
+  }, [name, identifierTouched])
+
+  function handleIdentifierChange(value: string) {
+    setIdentifierTouched(true)
+    setIdentifier(value.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 3))
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
 
-    await createWorkspace.mutateAsync({ name: name.trim(), type })
+    await createWorkspace.mutateAsync({
+      name: name.trim(),
+      identifier: identifier || undefined,
+      type,
+    })
 
     setName('')
+    setIdentifier('')
+    setIdentifierTouched(false)
     setType('work')
     onOpenChange(false)
   }
@@ -50,6 +71,23 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: CreateWorkspaceDia
               onChange={(e) => setName(e.target.value)}
               required
               autoFocus
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="workspace-identifier">
+              Identifier
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                Used as task prefix (e.g. {identifier || 'MUR'}-1)
+              </span>
+            </Label>
+            <Input
+              id="workspace-identifier"
+              placeholder="MUR"
+              value={identifier}
+              onChange={(e) => handleIdentifierChange(e.target.value)}
+              maxLength={3}
+              className="w-24 font-mono uppercase"
             />
           </div>
 

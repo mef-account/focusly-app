@@ -51,7 +51,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
-import { STATUS_LABELS, PRIORITY_LABELS, formatDate, formatMinutes, formatDuration, parseEstimate, cn } from '@/lib/utils'
+import { STATUS_LABELS, PRIORITY_LABELS, formatDate, formatMinutes, formatDuration, parseEstimate, getTaskKey, cn } from '@/lib/utils'
 import type { Task, TaskStatus, TaskPriority, ViewGroupBy, Project } from '@/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -607,7 +607,7 @@ function ViewsPageInner() {
           <table className="w-full table-fixed border-collapse text-[13px]">
             {/* Colgroup ensures all rows — header, group, task — use identical widths */}
             <colgroup>
-              <col style={{ width: 24 }} />
+              <col style={{ width: 64 }} />
               <col style={{ width: colW['title'] }} />
               {showCol('status')           && <col style={{ width: colW['status'] }} />}
               {showCol('assignee')         && <col style={{ width: colW['assignee'] }} />}
@@ -622,7 +622,7 @@ function ViewsPageInner() {
             {/* Column headers */}
             <thead className="sticky top-0 z-10 border-b bg-background">
               <tr>
-                <th style={{ width: 24 }} className="h-8 px-1 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground">#</th>
+                <th style={{ width: 64 }} className="h-8 px-2 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">ID</th>
                 <ColHeader label="Task"         col="title"           width={colW['title']}           onResize={startResize} />
                 {showCol('status')           && <ColHeader label="Status"       col="status"           width={colW['status']}           onResize={startResize} center />}
                 {showCol('assignee')         && <ColHeader label="Assignee"     col="assignee"         width={colW['assignee']}         onResize={startResize} />}
@@ -667,7 +667,7 @@ function ViewsPageInner() {
                       )}
                       onClick={toggleKey}
                     >
-                      <td style={{ width: 24 }} className="h-7" />
+                      <td style={{ width: 64 }} className="h-7" />
                       <td style={{ width: colW['title'] }} className="h-7 px-2">
                         <span className={cn('flex items-center gap-2 text-sm font-semibold text-foreground', indent && 'pl-4')}>
                           {isCollapsed ? (
@@ -951,9 +951,11 @@ function TaskRow({
       className="border-b last:border-0 hover:bg-accent/20 cursor-pointer transition-colors"
       onClick={onOpen}
     >
-      {/* Row number */}
-      <td style={{ width: 24 }} className="h-7 px-1 text-center text-[11px] text-muted-foreground/50 select-none tabular-nums">
-        {rowNum}
+      {/* Task key (e.g. MUR-4) */}
+      <td style={{ width: 64 }} className="h-7 px-2 text-left select-none">
+        <span className="text-[11px] font-mono text-muted-foreground/60 tabular-nums">
+          {getTaskKey(task) ?? rowNum}
+        </span>
       </td>
 
       {/* Title */}

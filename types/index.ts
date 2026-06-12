@@ -28,6 +28,7 @@ export interface Profile {
 export interface Workspace {
   id: string
   name: string
+  identifier: string | null
   type: 'personal' | 'work'
   owner_id: string
   created_at: string
@@ -99,10 +100,12 @@ export interface Task {
   due_date: string | null
   scheduled_start: string | null
   estimate_minutes: number | null
+  task_number?: number | null
   created_at: string
   updated_at: string
   // joined
   project?: Project
+  workspace?: { id: string; name: string; identifier: string | null } | null
   assignee?: Profile | null
   labels?: Label[]
   subtasks?: Task[]

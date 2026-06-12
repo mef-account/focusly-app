@@ -33,6 +33,7 @@ import {
   formatDate,
   formatMinutes,
   formatDuration,
+  getTaskKey,
   cn,
 } from '@/lib/utils'
 import type { Task, TaskStatus, TaskPriority } from '@/types'
@@ -108,6 +109,22 @@ export function ListView({
       size: 36,
       enableSorting: false,
       enableResizing: false,
+    },
+    {
+      id: 'task_key',
+      header: 'ID',
+      size: 64,
+      enableResizing: false,
+      enableSorting: false,
+      meta: { className: 'px-2' },
+      cell: ({ row }) => {
+        const key = getTaskKey(row.original)
+        return (
+          <span className="text-[11px] font-mono text-muted-foreground/60 tabular-nums">
+            {key ?? ''}
+          </span>
+        )
+      },
     },
     {
       id: 'status',

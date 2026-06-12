@@ -22,7 +22,7 @@ import { useTaskPanelStore } from '@/store/useTaskPanelStore'
 import { useWorkspaceStore } from '@/store/useWorkspaceStore'
 import { TaskTimerButton } from '@/components/tracker/TaskTimerButton'
 import { AssigneePicker } from '@/components/tasks/AssigneePicker'
-import { PRIORITY_CLASSES, PRIORITY_LABELS, formatDate, formatDuration, cn } from '@/lib/utils'
+import { PRIORITY_CLASSES, PRIORITY_LABELS, formatDate, formatDuration, getTaskKey, cn } from '@/lib/utils'
 import type { Task, TaskStatus } from '@/types'
 
 const COLUMNS: { id: TaskStatus; label: string }[] = [
@@ -57,8 +57,15 @@ function TaskCard({ task, overlay, loggedSeconds, noteCount }: { task: Task; ove
         overlay && 'rotate-1 shadow-lg'
       )}
     >
-      <p className="text-sm font-medium leading-snug">{task.title}</p>
-      <div className="mt-2 flex items-center justify-between gap-2">
+      <div className="flex items-start justify-between gap-1 mb-1">
+        <p className="text-sm font-medium leading-snug flex-1">{task.title}</p>
+        {getTaskKey(task) && (
+          <span className="shrink-0 text-[10px] font-mono text-muted-foreground/50 tabular-nums pt-0.5">
+            {getTaskKey(task)}
+          </span>
+        )}
+      </div>
+      <div className="mt-1 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           {task.priority !== 'none' && (
             <Badge className={cn('text-[10px] px-1.5 py-0', PRIORITY_CLASSES[task.priority])}>

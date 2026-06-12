@@ -52,6 +52,7 @@ import {
   formatDuration,
   formatDate,
   parseEstimate,
+  getTaskKey,
   cn,
 } from '@/lib/utils'
 import type { Task, TaskStatus, TaskPriority, Comment } from '@/types'
@@ -413,6 +414,11 @@ export function TaskSheet() {
 
             {/* Title */}
             <div className="px-8 pt-8 pb-4">
+              {getTaskKey(task) && (
+                <span className="mb-1.5 block text-xs font-mono font-medium text-muted-foreground/60 select-none">
+                  {getTaskKey(task)}
+                </span>
+              )}
               <input
                 className="w-full bg-transparent text-2xl font-bold outline-none placeholder:text-muted-foreground/50 leading-snug"
                 value={titleEdit}

@@ -19,19 +19,30 @@ interface EditWorkspaceDialogProps {
 export function EditWorkspaceDialog({ workspace, open, onOpenChange }: EditWorkspaceDialogProps) {
   const updateWorkspace = useUpdateWorkspace()
   const [name, setName] = useState(workspace.name)
+  const [identifier, setIdentifier] = useState(workspace.identifier ?? '')
   const [type, setType] = useState<'personal' | 'work'>(workspace.type)
 
   useEffect(() => {
     if (open) {
       setName(workspace.name)
+      setIdentifier(workspace.identifier ?? '')
       setType(workspace.type)
     }
   }, [open, workspace])
 
+  function handleIdentifierChange(value: string) {
+    setIdentifier(value.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 3))
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
-    await updateWorkspace.mutateAsync({ id: workspace.id, name: name.trim(), type })
+    await updateWorkspace.mutateAsync({
+      id: workspace.id,
+      name: name.trim(),
+      identifier: identifier || undefined,
+      type,
+    })
     onOpenChange(false)
   }
 
@@ -52,6 +63,24 @@ export function EditWorkspaceDialog({ workspace, open, onOpenChange }: EditWorks
               autoFocus
             />
           </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-ws-identifier">
+              Identifier
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                Task prefix — changing this does not rename existing task keys
+              </span>
+            </Label>
+            <Input
+              id="edit-ws-identifier"
+              placeholder="MUR"
+              value={identifier}
+              onChange={(e) => handleIdentifierChange(e.target.value)}
+              maxLength={3}
+              className="w-24 font-mono uppercase"
+            />
+          </div>
+
           <div className="space-y-1.5">
             <Label>Type</Label>
             <div className="flex gap-2">
@@ -71,6 +100,7 @@ export function EditWorkspaceDialog({ workspace, open, onOpenChange }: EditWorks
               ))}
             </div>
           </div>
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit" disabled={!name.trim() || updateWorkspace.isPending}>
