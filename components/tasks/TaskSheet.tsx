@@ -31,8 +31,13 @@ import {
   Paperclip,
   Download,
   Loader2,
+  Mail,
+  MessageSquare,
+  Copy,
+  Send,
 } from 'lucide-react'
 import { format, parseISO, formatDistanceToNow } from 'date-fns'
+import { toast } from 'sonner'
 import { useTaskPanelStore } from '@/store/useTaskPanelStore'
 import { useUpdateTask, useDeleteTask } from '@/lib/queries/useTasks'
 import { useTimeTotalsByTask } from '@/lib/queries/useTimeEntries'
@@ -253,6 +258,13 @@ export function TaskSheet() {
   const [titleEdit, setTitleEdit] = useState('')
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
+  // Email compose mode
+  const [composeMode, setComposeMode] = useState<'comment' | 'email'>('comment')
+  const [emailTo, setEmailTo] = useState('')
+  const [emailSubject, setEmailSubject] = useState('')
+  const [emailBody, setEmailBody] = useState('')
+  const [sendingEmail, setSendingEmail] = useState(false)
+
   // Structure cascade filter state
   const [filterWorkspaceId, setFilterWorkspaceId] = useState<string | null>(null)
   const [filterPortfolioId, setFilterPortfolioId] = useState<string | null>(null)
@@ -262,7 +274,7 @@ export function TaskSheet() {
 
     supabase
       .from('tasks')
-      .select('*, project:projects(id,name,color,workspace_id,portfolio_id), assignee:profiles!assignee_id(id,name,avatar_url)')
+      .select('*, project:projects(id,name,color,workspace_id,portfolio_id), workspace:workspaces(id,name,identifier), assignee:profiles!assignee_id(id,name,avatar_url)')
       .eq('id', activeTaskId)
       .single()
       .then(({ data }) => {
@@ -367,6 +379,48 @@ export function TaskSheet() {
       .single()
     if (data) setComments((prev) => [...prev, data as Comment])
     setNewComment('')
+  }
+
+  async function sendEmail() {
+    if (!task || !emailTo.trim() || !emailBody.trim()) return
+    setSendingEmail(true)
+    try {
+      const toList = emailTo.split(',').map((e) => e.trim()).filter(Boolean)
+      const res = await fetch('/api/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: task.id,
+          to: toList,
+          subject: emailSubject || task.title,
+          body: emailBody,
+        }),
+      })
+      if (!res.ok) throw new Error('Send failed')
+      toast.success('Email sent')
+      // Refresh comments to show the sent email
+      const { data } = await supabase
+        .from('comments')
+        .select('*, author:profiles(id,name,avatar_url)')
+        .eq('task_id', task.id)
+        .order('created_at', { ascending: true })
+      if (data) setComments(data as Comment[])
+      setEmailTo('')
+      setEmailSubject('')
+      setEmailBody('')
+      setComposeMode('comment')
+    } catch {
+      toast.error('Could not send email')
+    } finally {
+      setSendingEmail(false)
+    }
+  }
+
+  function copyTaskEmail() {
+    if (!task) return
+    const domain = 'mail.codicocorp.com'
+    const address = task.task_email ?? `task-${task.id.replace(/-/g, '').slice(0, 8)}@${domain}`
+    navigator.clipboard.writeText(address).then(() => toast.success('Email address copied'))
   }
 
   // ── Derived structure data ─────────────────────────────────────────────────
@@ -586,8 +640,20 @@ export function TaskSheet() {
 
               {/* Activity */}
               <div className="pt-5">
+                {/* Header row: title + copyable email chip */}
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-sm font-semibold">Activity</span>
+                  <button
+                    onClick={copyTaskEmail}
+                    title="Copy task email address"
+                    className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[11px] font-mono text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                  >
+                    <Mail className="h-3 w-3 shrink-0" />
+                    <span className="max-w-[180px] truncate">
+                      {task.task_email ?? `task-${task.id.replace(/-/g, '').slice(0, 8)}@mail.codicocorp.com`}
+                    </span>
+                    <Copy className="h-3 w-3 shrink-0" />
+                  </button>
                 </div>
 
                 {/* Created line */}
@@ -602,38 +668,124 @@ export function TaskSheet() {
 
                 {/* Comments */}
                 <div className="space-y-4">
-                  {comments.map((c) => (
-                    <div key={c.id} className="flex gap-3">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
-                        {(c.author as any)?.name?.[0]?.toUpperCase() ?? '?'}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-baseline gap-2 mb-1">
-                          <p className="text-xs font-semibold">{(c.author as any)?.name ?? 'Unknown'}</p>
-                          <span className="text-[10px] text-muted-foreground">
-                            {format(new Date(c.created_at), 'MMM d, yyyy · h:mm a')}
-                          </span>
+                  {comments.map((c) => {
+                    const isEmail = c.source === 'email'
+                    const displayName = (c.author as any)?.name ?? c.sender_email ?? 'Unknown'
+                    const initial = displayName[0]?.toUpperCase() ?? '?'
+                    return (
+                      <div key={c.id} className="flex gap-3">
+                        <div className={cn(
+                          'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+                          isEmail ? 'bg-blue-500/15 text-blue-600' : 'bg-primary/15 text-primary'
+                        )}>
+                          {isEmail ? <Mail className="h-3.5 w-3.5" /> : initial}
                         </div>
-                        <div className="rounded-xl border bg-muted/40 px-4 py-3 text-sm">
-                          {c.body}
+                        <div className="flex-1">
+                          <div className="flex items-baseline gap-2 mb-1">
+                            <p className="text-xs font-semibold flex items-center gap-1">
+                              {isEmail && <Mail className="h-3 w-3 text-blue-500" />}
+                              {displayName}
+                            </p>
+                            <span className="text-[10px] text-muted-foreground">
+                              {format(new Date(c.created_at), 'MMM d, yyyy · h:mm a')}
+                            </span>
+                          </div>
+                          <div className={cn(
+                            'rounded-xl border px-4 py-3 text-sm whitespace-pre-wrap',
+                            isEmail ? 'bg-blue-500/5 border-blue-500/20' : 'bg-muted/40'
+                          )}>
+                            {c.body}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
 
-                {/* Comment input */}
-                <div className="mt-4 rounded-xl border bg-muted/20 px-4 py-3 focus-within:ring-1 focus-within:ring-ring transition-all">
-                  <input
-                    className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
-                    placeholder="Leave a comment…"
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComment() } }}
-                  />
-                  {newComment.trim() && (
-                    <div className="mt-2 flex justify-end">
-                      <Button size="sm" onClick={addComment} className="h-7 text-xs">Send</Button>
+                {/* Compose toggle tabs */}
+                <div className="mt-4">
+                  <div className="flex gap-1 mb-3">
+                    <button
+                      onClick={() => setComposeMode('comment')}
+                      className={cn(
+                        'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                        composeMode === 'comment'
+                          ? 'bg-accent text-accent-foreground'
+                          : 'text-muted-foreground hover:bg-accent/50'
+                      )}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      Comment
+                    </button>
+                    <button
+                      onClick={() => { setComposeMode('email'); if (!emailSubject) setEmailSubject(task.title) }}
+                      className={cn(
+                        'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                        composeMode === 'email'
+                          ? 'bg-accent text-accent-foreground'
+                          : 'text-muted-foreground hover:bg-accent/50'
+                      )}
+                    >
+                      <Mail className="h-3.5 w-3.5" />
+                      Email
+                    </button>
+                  </div>
+
+                  {composeMode === 'comment' ? (
+                    <div className="rounded-xl border bg-muted/20 px-4 py-3 focus-within:ring-1 focus-within:ring-ring transition-all">
+                      <input
+                        className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+                        placeholder="Leave a comment…"
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComment() } }}
+                      />
+                      {newComment.trim() && (
+                        <div className="mt-2 flex justify-end">
+                          <Button size="sm" onClick={addComment} className="h-7 text-xs">Send</Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border bg-muted/20 px-4 py-3 space-y-2.5 focus-within:ring-1 focus-within:ring-ring transition-all">
+                      <div className="flex items-center gap-2 border-b pb-2">
+                        <span className="text-xs font-medium text-muted-foreground w-14 shrink-0">To:</span>
+                        <input
+                          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+                          placeholder="recipient@example.com, another@example.com"
+                          value={emailTo}
+                          onChange={(e) => setEmailTo(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 border-b pb-2">
+                        <span className="text-xs font-medium text-muted-foreground w-14 shrink-0">Subject:</span>
+                        <input
+                          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+                          placeholder={task.title}
+                          value={emailSubject}
+                          onChange={(e) => setEmailSubject(e.target.value)}
+                        />
+                      </div>
+                      <textarea
+                        className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/60 resize-none min-h-[80px]"
+                        placeholder="Write your message…"
+                        value={emailBody}
+                        onChange={(e) => setEmailBody(e.target.value)}
+                      />
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-[11px] text-muted-foreground/60 font-mono">
+                          from: {task.task_email ?? `task-${task.id.replace(/-/g, '').slice(0, 8)}@mail.codicocorp.com`}
+                        </span>
+                        <Button
+                          size="sm"
+                          className="h-7 gap-1.5 text-xs"
+                          disabled={!emailTo.trim() || !emailBody.trim() || sendingEmail}
+                          onClick={sendEmail}
+                        >
+                          <Send className="h-3 w-3" />
+                          {sendingEmail ? 'Sending…' : 'Send email'}
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>

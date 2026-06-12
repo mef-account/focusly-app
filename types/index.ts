@@ -89,6 +89,7 @@ export interface Task {
   id: string
   workspace_id: string | null
   project_id: string | null
+  task_email?: string | null
   parent_task_id: string | null
   title: string
   description: string | null
@@ -117,10 +118,12 @@ export interface Task {
 export interface Comment {
   id: string
   task_id: string
-  author_id: string
+  author_id: string | null
   body: string
+  source?: 'ui' | 'email'
+  sender_email?: string | null
   created_at: string
-  author?: Profile
+  author?: Profile | null
 }
 
 // ─── Task Activity ────────────────────────────────────────────────────────────
