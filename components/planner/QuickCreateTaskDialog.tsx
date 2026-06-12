@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select'
 import { useCreateTask } from '@/lib/queries/useTasks'
 import { useProjects } from '@/lib/queries/useProjects'
+import { useWorkspaceStore } from '@/store/useWorkspaceStore'
 import { parseEstimate } from '@/lib/utils'
 import { format, parseISO } from 'date-fns'
 
@@ -33,6 +34,7 @@ interface QuickCreateTaskDialogProps {
 export function QuickCreateTaskDialog({ open, onOpenChange, dueDate }: QuickCreateTaskDialogProps) {
   const createTask = useCreateTask()
   const { data: projects = [] } = useProjects()
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
 
   const [title, setTitle] = useState('')
   const [projectId, setProjectId] = useState<string | null>(null)
@@ -50,6 +52,7 @@ export function QuickCreateTaskDialog({ open, onOpenChange, dueDate }: QuickCrea
 
     await createTask.mutateAsync({
       title: title.trim(),
+      workspace_id: activeWorkspaceId,
       project_id: projectId,
       status: 'todo',
       priority: 'none',

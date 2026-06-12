@@ -169,27 +169,25 @@ export function Sidebar() {
 
         {workspaces.length > 1 ? (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className={cn(
-                  'flex w-full items-center gap-2 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent',
-                  collapsed && 'justify-center px-2'
-                )}
-              >
-                <Avatar className="h-7 w-7 shrink-0">
-                  <AvatarFallback className="bg-brand-100 text-brand-800 text-xs">
-                    {activeWorkspace?.name?.[0]?.toUpperCase() ?? 'W'}
-                  </AvatarFallback>
-                </Avatar>
-                {!collapsed && (
-                  <>
-                    <span className="flex-1 truncate text-xs text-muted-foreground">
-                      {activeWorkspace?.name ?? 'Workspace'}
-                    </span>
-                    <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
-                  </>
-                )}
-              </button>
+            <DropdownMenuTrigger render={
+              <button className={cn(
+                'flex w-full items-center gap-2 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent',
+                collapsed && 'justify-center px-2'
+              )} />
+            }>
+              <Avatar className="h-7 w-7 shrink-0">
+                <AvatarFallback className="bg-brand-100 text-brand-800 text-xs">
+                  {activeWorkspace?.name?.[0]?.toUpperCase() ?? 'W'}
+                </AvatarFallback>
+              </Avatar>
+              {!collapsed && (
+                <>
+                  <span className="flex-1 truncate text-xs text-muted-foreground">
+                    {activeWorkspace?.name ?? 'Workspace'}
+                  </span>
+                  <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+                </>
+              )}
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="start" className="w-52">
               {workspaces.map((ws) => (

@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useUpdateTask, useCreateTask } from '@/lib/queries/useTasks'
 import { useTaskPanelStore } from '@/store/useTaskPanelStore'
+import { useWorkspaceStore } from '@/store/useWorkspaceStore'
 import { TaskTimerButton } from '@/components/tracker/TaskTimerButton'
 import { AssigneePicker } from '@/components/tasks/AssigneePicker'
 import { PRIORITY_CLASSES, PRIORITY_LABELS, formatDate, formatDuration, cn } from '@/lib/utils'
@@ -111,6 +112,7 @@ function Column({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.id })
   const createTask = useCreateTask()
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
 
@@ -120,6 +122,7 @@ function Column({
     try {
       await createTask.mutateAsync({
         title,
+        workspace_id: activeWorkspaceId,
         project_id: projectId,
         status: col.id,
         priority: 'none',
