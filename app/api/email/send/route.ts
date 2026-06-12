@@ -4,10 +4,17 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
-const DOMAIN = process.env.RESEND_RECEIVING_DOMAIN ?? 'mail.codicocorp.com'
+const DOMAIN = process.env.RESEND_RECEIVING_DOMAIN ?? 'task.codicocorp.com'
 
-/** Derive the inbound address from a task UUID */
-function taskEmailAddress(taskId: string): string {
+/** Build email address: PER-1@task.codicocorp.com */
+function taskEmailAddress(
+  taskId: string,
+  identifier?: string | null,
+  taskNumber?: number | null
+): string {
+  if (identifier && taskNumber != null) {
+    return `${identifier}-${taskNumber}@${DOMAIN}`
+  }
   return `task-${taskId.replace(/-/g, '').slice(0, 8)}@${DOMAIN}`
 }
 
@@ -34,7 +41,7 @@ export async function POST(req: NextRequest) {
     // Fetch task + workspace/project for the From name and task_email
     const { data: task, error: taskErr } = await admin
       .from('tasks')
-      .select('id, title, task_email, workspace_id, project_id, project:projects(name), workspace:workspaces(name,identifier)')
+      .select('id, title, task_email, task_number, workspace_id, project_id, project:projects(name), workspace:workspaces(name,identifier)')
       .eq('id', taskId)
       .single()
 
@@ -45,7 +52,9 @@ export async function POST(req: NextRequest) {
     // Assign task_email if not yet set
     let taskEmail = task.task_email as string | null
     if (!taskEmail) {
-      taskEmail = taskEmailAddress(taskId)
+      const identifier = (task.workspace as any)?.identifier as string | null
+      const taskNumber = task.task_number as number | null
+      taskEmail = taskEmailAddress(taskId, identifier, taskNumber)
       await admin.from('tasks').update({ task_email: taskEmail }).eq('id', taskId)
     }
 

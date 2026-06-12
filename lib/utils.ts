@@ -164,6 +164,23 @@ export function getTaskKey(task: Pick<Task, 'task_number' | 'workspace'>): strin
   return identifier && task.task_number != null ? `${identifier}-${task.task_number}` : null
 }
 
+/**
+ * Build the inbound email address for a task using its human-readable key.
+ * e.g. identifier="PER", taskNumber=1 → "PER-1@task.codicocorp.com"
+ * Falls back to UUID prefix when identifier/number are not yet available.
+ */
+export function getTaskEmailAddress(
+  task: Pick<Task, 'id' | 'task_number' | 'task_email' | 'workspace'>,
+  domain = 'task.codicocorp.com'
+): string {
+  if (task.task_email) return task.task_email
+  const identifier = task.workspace?.identifier
+  if (identifier && task.task_number != null) {
+    return `${identifier}-${task.task_number}@${domain}`
+  }
+  return `task-${task.id.replace(/-/g, '').slice(0, 8)}@${domain}`
+}
+
 /** Auto-suggest a 3-letter identifier from a workspace name */
 export function suggestIdentifier(name: string): string {
   const letters = name.replace(/[^a-zA-Z]/g, '').toUpperCase()

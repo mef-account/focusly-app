@@ -58,6 +58,7 @@ import {
   formatDate,
   parseEstimate,
   getTaskKey,
+  getTaskEmailAddress,
   cn,
 } from '@/lib/utils'
 import type { Task, TaskStatus, TaskPriority, Comment } from '@/types'
@@ -418,8 +419,7 @@ export function TaskSheet() {
 
   function copyTaskEmail() {
     if (!task) return
-    const domain = 'mail.codicocorp.com'
-    const address = task.task_email ?? `task-${task.id.replace(/-/g, '').slice(0, 8)}@${domain}`
+    const address = getTaskEmailAddress(task)
     navigator.clipboard.writeText(address).then(() => toast.success('Email address copied'))
   }
 
@@ -650,7 +650,7 @@ export function TaskSheet() {
                   >
                     <Mail className="h-3 w-3 shrink-0" />
                     <span className="max-w-[180px] truncate">
-                      {task.task_email ?? `task-${task.id.replace(/-/g, '').slice(0, 8)}@mail.codicocorp.com`}
+                      {getTaskEmailAddress(task)}
                     </span>
                     <Copy className="h-3 w-3 shrink-0" />
                   </button>
@@ -774,7 +774,7 @@ export function TaskSheet() {
                       />
                       <div className="flex items-center justify-between pt-1">
                         <span className="text-[11px] text-muted-foreground/60 font-mono">
-                          from: {task.task_email ?? `task-${task.id.replace(/-/g, '').slice(0, 8)}@mail.codicocorp.com`}
+                          from: {getTaskEmailAddress(task)}
                         </span>
                         <Button
                           size="sm"

@@ -56,40 +56,51 @@ export async function POST(req: NextRequest) {
   const fromAddress: string = data.from ?? ''
   const emailText: string = data.text ?? ''
 
-  // 4. Find the task-* address in the To field
-  const taskAddress = toAddresses.find((a: string) => a.includes('task-'))
-  if (!taskAddress) {
-    // Not addressed to a task — ignore
+  const domain = process.env.RESEND_RECEIVING_DOMAIN ?? 'task.codicocorp.com'
+
+  // 4. Extract the bare email address from the To field (strip display name if present)
+  const rawTo = toAddresses[0] ?? ''
+  const bareAddress = (rawTo.match(/<(.+)>/) ?? [, rawTo])[1]?.trim() ?? rawTo.trim()
+
+  // Must be addressed to our receiving domain
+  if (!bareAddress.endsWith(`@${domain}`)) {
     return NextResponse.json({ ok: true })
   }
 
-  // 5. Extract the short task ID prefix from the address (task-{first8chars}@...)
-  const match = taskAddress.match(/task-([a-f0-9]{8})@/)
-  if (!match) return NextResponse.json({ ok: true })
-  const shortId = match[1]
+  // 5. Parse "PER-1@task.codicocorp.com" → identifier="PER", taskNumber=1
+  const localPart = bareAddress.split('@')[0].toUpperCase() // e.g. "PER-1"
+  const keyMatch = localPart.match(/^([A-Z]+)-(\d+)$/)
+  if (!keyMatch) return NextResponse.json({ ok: true })
+  const identifier = keyMatch[1]
+  const taskNumber = parseInt(keyMatch[2], 10)
 
-  // 6. Look up the task by task_email
+  // 6. Look up the task via workspace identifier + task_number
   const admin = createAdminClient()
-  const { data: task } = await admin
-    .from('tasks')
-    .select('id')
-    .eq('task_email', taskAddress.split('<').pop()?.replace('>', '').trim() ?? taskAddress)
-    .single()
 
-  // Fallback: look up by matching the short ID prefix in task_email column
-  let taskId: string | null = task?.id ?? null
-  if (!taskId) {
-    const domain = process.env.RESEND_RECEIVING_DOMAIN ?? 'mail.codicocorp.com'
-    const { data: taskByEmail } = await admin
-      .from('tasks')
-      .select('id')
-      .eq('task_email', `task-${shortId}@${domain}`)
-      .single()
-    taskId = taskByEmail?.id ?? null
+  // Find workspace(s) with this identifier
+  const { data: wsRows } = await admin
+    .from('workspaces')
+    .select('id')
+    .eq('identifier', identifier)
+
+  if (!wsRows?.length) {
+    console.warn('[email/inbound] No workspace found for identifier:', identifier)
+    return NextResponse.json({ ok: true })
   }
 
+  const workspaceIds = wsRows.map((w: { id: string }) => w.id)
+
+  const { data: taskRow } = await admin
+    .from('tasks')
+    .select('id')
+    .in('workspace_id', workspaceIds)
+    .eq('task_number', taskNumber)
+    .maybeSingle()
+
+  const taskId: string | null = taskRow?.id ?? null
+
   if (!taskId) {
-    console.warn('[email/inbound] No task found for address:', taskAddress)
+    console.warn('[email/inbound] No task found for address:', bareAddress)
     return NextResponse.json({ ok: true }) // Acknowledge to Resend, just don't create comment
   }
 
