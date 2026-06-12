@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Check, ChevronDown, Clock, FolderKanban, CalendarIcon, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Clock, FolderKanban, CalendarIcon, X, Building2 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -18,7 +18,9 @@ import { Badge } from '@/components/ui/badge'
 import { AssigneePicker } from '@/components/tasks/AssigneePicker'
 import { useCreateTask } from '@/lib/queries/useTasks'
 import { useProjects } from '@/lib/queries/useProjects'
+import { useWorkspaces } from '@/lib/queries/useWorkspace'
 import { useQuickCreateStore } from '@/store/useQuickCreateStore'
+import { useWorkspaceStore } from '@/store/useWorkspaceStore'
 import {
   STATUS_CLASSES,
   STATUS_LABELS,
@@ -36,7 +38,21 @@ const PRIORITIES: TaskPriority[] = ['urgent', 'high', 'medium', 'low', 'none']
 export function QuickCreateTaskDialog() {
   const { isOpen, close } = useQuickCreateStore()
   const createTask = useCreateTask()
-  const { data: projects = [] } = useProjects()
+  const { data: allProjects = [] } = useProjects()
+  const { data: workspaces = [] } = useWorkspaces()
+  const { activeWorkspaceId, setActiveWorkspace } = useWorkspaceStore()
+
+  // Auto-select first workspace if none stored yet
+  useEffect(() => {
+    if (!activeWorkspaceId && workspaces.length > 0) {
+      setActiveWorkspace(workspaces[0].id)
+    }
+  }, [activeWorkspaceId, workspaces, setActiveWorkspace])
+
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) ?? workspaces[0]
+  const projects = activeWorkspaceId
+    ? allProjects.filter((p) => p.workspace_id === activeWorkspaceId)
+    : allProjects
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -51,12 +67,22 @@ export function QuickCreateTaskDialog() {
 
   const titleRef = useRef<HTMLInputElement>(null)
 
-  // No auto-select — "No project" is the default  // Focus title on open
+  // Focus title on open
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => titleRef.current?.focus(), 50)
     }
   }, [isOpen])
+
+  // Reset project if it no longer belongs to the newly selected workspace
+  useEffect(() => {
+    if (projectId && activeWorkspaceId) {
+      const stillValid = allProjects.find(
+        (p) => p.id === projectId && p.workspace_id === activeWorkspaceId
+      )
+      if (!stillValid) setProjectId(null)
+    }
+  }, [activeWorkspaceId, projectId, allProjects])
 
   function reset() {
     setTitle('')
@@ -77,6 +103,7 @@ export function QuickCreateTaskDialog() {
       description: description.trim() || null,
       status,
       priority,
+      workspace_id: activeWorkspace?.id ?? null,
       project_id: projectId,
       assignee_id: assigneeId,
       estimate_minutes: estimateMinutes,
@@ -101,8 +128,39 @@ export function QuickCreateTaskDialog() {
   return (
     <Dialog open={isOpen} onOpenChange={(o) => !o && close()}>
       <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        {/* Workspace header — Linear-style breadcrumb */}
+        <div className="flex items-center gap-1.5 px-4 pt-4">
+          {workspaces.length > 1 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger render={
+                <button className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors" />
+              }>
+                <Building2 className="h-3.5 w-3.5" />
+                <span>{activeWorkspace?.name ?? 'Workspace'}</span>
+                <ChevronDown className="h-3 w-3" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {workspaces.map((ws) => (
+                  <DropdownMenuItem key={ws.id} onClick={() => setActiveWorkspace(ws.id)}>
+                    <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span>{ws.name}</span>
+                    {activeWorkspaceId === ws.id && <Check className="ml-auto h-3 w-3" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-muted-foreground">
+              <Building2 className="h-3.5 w-3.5" />
+              <span>{activeWorkspace?.name ?? 'Workspace'}</span>
+            </div>
+          )}
+          <ChevronRight className="h-3 w-3 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">New task</span>
+        </div>
+
         {/* Title */}
-        <div className="px-5 pt-5">
+        <div className="px-5 pt-3">
           <input
             ref={titleRef}
             className="w-full bg-transparent text-lg font-medium outline-none placeholder:text-muted-foreground"

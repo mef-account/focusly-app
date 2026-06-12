@@ -173,6 +173,8 @@ export function useCreateTask() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (task: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
+      if (!task.workspace_id) throw new Error('A workspace is required to create a task.')
+
       if (task.status === 'in_progress') {
         if (!task.estimate_minutes)                      throw new Error('A task needs an estimate before starting.')
         if (!task.project_id)                            throw new Error('A task needs a project before starting.')
