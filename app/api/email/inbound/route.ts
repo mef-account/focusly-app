@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Webhook } from 'svix'
+import { Resend } from 'resend'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 // Must be disabled so we can read raw body for signature verification
@@ -70,6 +71,27 @@ export async function POST(req: NextRequest) {
       .replace(/&gt;/g, '>')
       .replace(/\s{2,}/g, ' ')
       .trim()
+  }
+
+  // If body still empty, fetch full email via Resend API using email_id
+  if (!emailText && data.email_id) {
+    try {
+      const resend = new Resend(process.env.RESEND_API_KEY)
+      const { data: fullEmail, error: fetchErr } = await resend.emails.get(data.email_id)
+      console.log('[email/inbound] fetched email via API — text length:', fullEmail?.text?.length ?? 0, '| html length:', fullEmail?.html?.length ?? 0, '| error:', fetchErr?.message)
+      if (fullEmail?.text) {
+        emailText = fullEmail.text
+      } else if (fullEmail?.html) {
+        emailText = (fullEmail.html as string)
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/\s{2,}/g, ' ')
+          .trim()
+      }
+    } catch (e) {
+      console.error('[email/inbound] Failed to fetch email via API:', e)
+    }
   }
 
   const domain = process.env.RESEND_RECEIVING_DOMAIN ?? 'task.codicocorp.com'
