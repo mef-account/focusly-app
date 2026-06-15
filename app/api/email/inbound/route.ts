@@ -73,12 +73,12 @@ export async function POST(req: NextRequest) {
       .trim()
   }
 
-  // If body still empty, fetch full email via Resend API using email_id
-  if (!emailText && data.email_id) {
+  // Webhook never includes body — always fetch via Receiving API
+  if (data.email_id) {
     try {
       const resend = new Resend(process.env.RESEND_API_KEY)
-      const { data: fullEmail, error: fetchErr } = await resend.emails.get(data.email_id)
-      console.log('[email/inbound] fetched email via API — text length:', fullEmail?.text?.length ?? 0, '| html length:', fullEmail?.html?.length ?? 0, '| error:', fetchErr?.message)
+      const { data: fullEmail, error: fetchErr } = await resend.emails.receiving.get(data.email_id)
+      console.log('[email/inbound] receiving.get — text length:', fullEmail?.text?.length ?? 0, '| html length:', fullEmail?.html?.length ?? 0, '| error:', fetchErr?.message)
       if (fullEmail?.text) {
         emailText = fullEmail.text
       } else if (fullEmail?.html) {
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
           .trim()
       }
     } catch (e) {
-      console.error('[email/inbound] Failed to fetch email via API:', e)
+      console.error('[email/inbound] Failed to fetch email via Receiving API:', e)
     }
   }
 
