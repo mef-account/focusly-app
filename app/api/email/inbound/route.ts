@@ -173,9 +173,14 @@ export async function POST(req: NextRequest) {
     .eq('email', senderEmail)
     .maybeSingle()
 
-  // 9. Insert comment — prepend subject if present
+  // 9. Build comment header (From, CC, Subject) then body
   const subject: string = data.subject ?? ''
-  const commentBody = subject ? `Subject: ${subject}\n\n${cleanBody}` : cleanBody
+  const ccList: string[] = Array.isArray(data.cc) ? data.cc.filter(Boolean) : []
+  const headerLines: string[] = []
+  headerLines.push(`From: ${senderEmail}`)
+  if (ccList.length) headerLines.push(`CC: ${ccList.join(', ')}`)
+  if (subject) headerLines.push(`Subject: ${subject}`)
+  const commentBody = `${headerLines.join('\n')}\n\n${cleanBody}`
 
   await admin.from('comments').insert({
     task_id: taskId,
