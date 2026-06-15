@@ -13,10 +13,17 @@ function stripReplyChain(text: string): string {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
-    // Stop at "On [date] ... wrote:" line (common reply delimiter)
-    if (/^On .+ wrote:$/i.test(line.trim())) break
-    // Stop at consecutive quoted lines
+    const trimmed = line.trim()
+
+    // Stop at single-line "On [date] ... wrote:" (some clients)
+    if (/^On .+ wrote:$/i.test(trimmed)) break
+    // Stop at Gmail multi-line quote header: line starts with "On " + date pattern
+    if (/^On \w{3},\s+\w{3}\s+\d+/i.test(trimmed)) break
+    // Stop when next line is just "wrote:" (second line of Gmail split header)
+    if (/^wrote:$/i.test(trimmed)) break
+    // Stop at quoted lines
     if (line.startsWith('>')) break
+
     result.push(line)
   }
 

@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Save outgoing email as a comment (source: 'email')
-    const commentBody = `**To:** ${to.join(', ')}\n**Subject:** ${subject || task.title}\n\n${body}`
+    const commentBody = `To: ${to.join(', ')}\nSubject: ${subject || task.title}\n\n${body}`
     await admin
       .from('comments')
       .insert({
