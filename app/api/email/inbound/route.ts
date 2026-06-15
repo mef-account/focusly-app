@@ -173,11 +173,14 @@ export async function POST(req: NextRequest) {
     .eq('email', senderEmail)
     .maybeSingle()
 
-  // 9. Insert comment
+  // 9. Insert comment — prepend subject if present
+  const subject: string = data.subject ?? ''
+  const commentBody = subject ? `Subject: ${subject}\n\n${cleanBody}` : cleanBody
+
   await admin.from('comments').insert({
     task_id: taskId,
     author_id: profile?.id ?? null,
-    body: cleanBody,
+    body: commentBody,
     source: 'email',
     sender_email: profile ? null : senderEmail,
   })
