@@ -17,6 +17,7 @@ import {
 import { NotesList } from '@/components/notes/NotesList'
 import { MarkdownEditor } from '@/components/notes/MarkdownEditor'
 import { useDailyNotes, useEnsureTodayDailyNote, useUpdateNote, useDeleteNote } from '@/lib/queries/useNotes'
+import { uploadNoteImage } from '@/lib/uploadNoteImage'
 import { format } from 'date-fns'
 
 const DEBOUNCE_MS = 800
@@ -147,6 +148,7 @@ export default function NotesPage() {
             value={content}
             onChange={handleContentChange}
             className="flex-1 overflow-hidden"
+            onImageUpload={uploadNoteImage}
           />
         </div>
       ) : (
