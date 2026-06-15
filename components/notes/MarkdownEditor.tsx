@@ -148,17 +148,58 @@ interface MarkdownEditorProps {
   onChange: (val: string) => void
   className?: string
   defaultMode?: ViewMode
+  /** Optional callback to upload a pasted image and return its public URL. */
+  onImageUpload?: (file: File) => Promise<string>
 }
 
-export function MarkdownEditor({ value, onChange, className, defaultMode = 'split' }: MarkdownEditorProps) {
+export function MarkdownEditor({ value, onChange, className, defaultMode = 'split', onImageUpload }: MarkdownEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const valueRef = useRef(value)
   const [mode, setMode] = useState<ViewMode>(defaultMode)
   const [html, setHtml] = useState('')
+
+  // Keep valueRef in sync so async handlers always see the latest value
+  useEffect(() => { valueRef.current = value }, [value])
 
   // Re-render preview whenever value changes
   useEffect(() => {
     setHtml(renderMarkdown(value))
   }, [value])
+
+  // Insert text at the current cursor position
+  function insertAtCursor(text: string) {
+    const ta = textareaRef.current
+    if (!ta) return
+    const { selectionStart: start, selectionEnd: end, value: v } = ta
+    const newVal = v.slice(0, start) + text + v.slice(end)
+    onChange(newVal)
+    requestAnimationFrame(() => {
+      ta.focus()
+      ta.setSelectionRange(start + text.length, start + text.length)
+    })
+  }
+
+  // Handle paste — intercept image files and upload them
+  const handlePaste = useCallback(
+    async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      if (!onImageUpload) return
+      const imageItem = Array.from(e.clipboardData.items).find((item) =>
+        item.type.startsWith('image/')
+      )
+      const imageFile = imageItem?.getAsFile()
+      if (!imageFile) return
+      e.preventDefault()
+      const placeholder = '![Uploading image…]()'
+      insertAtCursor(placeholder)
+      try {
+        const url = await onImageUpload(imageFile)
+        onChange(valueRef.current.replace(placeholder, `![image](${url})`))
+      } catch {
+        onChange(valueRef.current.replace(placeholder, ''))
+      }
+    },
+    [onImageUpload, onChange] // eslint-disable-line react-hooks/exhaustive-deps
+  )
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback(
@@ -250,6 +291,7 @@ export function MarkdownEditor({ value, onChange, className, defaultMode = 'spli
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
           />
         )}
 

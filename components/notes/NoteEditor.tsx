@@ -15,9 +15,25 @@ import {
 } from '@/components/ui/alert-dialog'
 import { MarkdownEditor } from '@/components/notes/MarkdownEditor'
 import { useNote, useUpdateNote, useDeleteNote } from '@/lib/queries/useNotes'
+import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 
 const DEBOUNCE_MS = 800
+const NOTE_IMAGES_BUCKET = 'note-images'
+
+async function uploadNoteImage(file: File): Promise<string> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const ext = file.type.split('/')[1]?.replace('jpeg', 'jpg') ?? 'png'
+  const path = `${user.id}/${crypto.randomUUID()}.${ext}`
+  const { error } = await supabase.storage.from(NOTE_IMAGES_BUCKET).upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  })
+  if (error) throw error
+  return supabase.storage.from(NOTE_IMAGES_BUCKET).getPublicUrl(path).data.publicUrl
+}
 
 type ViewMode = 'edit' | 'split' | 'preview'
 
@@ -114,6 +130,7 @@ export function NoteEditor({ noteId, defaultMode = 'split', actions, onDeleted, 
         onChange={handleContentChange}
         defaultMode={defaultMode}
         className="min-h-0 flex-1 overflow-hidden"
+        onImageUpload={uploadNoteImage}
       />
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
