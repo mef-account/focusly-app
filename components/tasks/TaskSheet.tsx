@@ -262,6 +262,7 @@ export function TaskSheet() {
   // Email compose mode
   const [composeMode, setComposeMode] = useState<'comment' | 'email'>('comment')
   const [emailTo, setEmailTo] = useState('')
+  const [emailCc, setEmailCc] = useState('')
   const [emailSubject, setEmailSubject] = useState('')
   const [emailBody, setEmailBody] = useState('')
   const [sendingEmail, setSendingEmail] = useState(false)
@@ -387,12 +388,14 @@ export function TaskSheet() {
     setSendingEmail(true)
     try {
       const toList = emailTo.split(',').map((e) => e.trim()).filter(Boolean)
+      const ccList = emailCc.split(',').map((e) => e.trim()).filter(Boolean)
       const res = await fetch('/api/email/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           taskId: task.id,
           to: toList,
+          cc: ccList.length ? ccList : undefined,
           subject: emailSubject || task.title,
           body: emailBody,
         }),
@@ -407,6 +410,7 @@ export function TaskSheet() {
         .order('created_at', { ascending: true })
       if (data) setComments(data as Comment[])
       setEmailTo('')
+      setEmailCc('')
       setEmailSubject('')
       setEmailBody('')
       setComposeMode('comment')
@@ -755,6 +759,15 @@ export function TaskSheet() {
                           placeholder="recipient@example.com, another@example.com"
                           value={emailTo}
                           onChange={(e) => setEmailTo(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 border-b pb-2">
+                        <span className="text-xs font-medium text-muted-foreground w-14 shrink-0">CC:</span>
+                        <input
+                          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+                          placeholder="cc@example.com, another@example.com"
+                          value={emailCc}
+                          onChange={(e) => setEmailCc(e.target.value)}
                         />
                       </div>
                       <div className="flex items-center gap-2 border-b pb-2">

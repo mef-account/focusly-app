@@ -20,9 +20,10 @@ function taskEmailAddress(
 export async function POST(req: NextRequest) {
   try {
     const resend = new Resend(process.env.RESEND_API_KEY)
-    const { taskId, to, subject, body } = await req.json() as {
+    const { taskId, to, cc, subject, body } = await req.json() as {
       taskId: string
       to: string[]
+      cc?: string[]
       subject: string
       body: string
     }
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest) {
       from: fromAddress,
       replyTo: taskEmail,
       to,
+      cc: cc?.length ? cc : undefined,
       subject: subject || task.title,
       text: body,
     })
@@ -83,7 +85,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Save outgoing email as a comment (source: 'email')
-    const commentBody = `To: ${to.join(', ')}\nSubject: ${subject || task.title}\n\n${body}`
+    const headerLines = [`To: ${to.join(', ')}`]
+    if (cc?.length) headerLines.push(`CC: ${cc.join(', ')}`)
+    headerLines.push(`Subject: ${subject || task.title}`)
+    const commentBody = `${headerLines.join('\n')}\n\n${body}`
     await admin
       .from('comments')
       .insert({
