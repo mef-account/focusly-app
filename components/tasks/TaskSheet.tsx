@@ -762,7 +762,7 @@ export function TaskSheet() {
                         />
                       </div>
                       <div className="flex items-center gap-2 border-b pb-2">
-                        <span className="text-xs font-medium text-muted-foreground w-14 shrink-0">CC:</span>
+                        <span className="text-xs font-medium text-muted-foreground w-14 shrink-0">Cc:</span>
                         <input
                           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
                           placeholder="cc@example.com, another@example.com"

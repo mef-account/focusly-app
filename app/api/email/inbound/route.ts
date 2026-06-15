@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
   const ccList: string[] = Array.isArray(data.cc) ? data.cc.filter(Boolean) : []
   const headerLines: string[] = []
   headerLines.push(`From: ${senderEmail}`)
-  if (ccList.length) headerLines.push(`CC: ${ccList.join(', ')}`)
+  if (ccList.length) headerLines.push(`Cc: ${ccList.join(', ')}`)
   if (subject) headerLines.push(`Subject: ${subject}`)
   const commentBody = `${headerLines.join('\n')}\n\n${cleanBody}`
 

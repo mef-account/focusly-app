@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     // Save outgoing email as a comment (source: 'email')
     const headerLines = [`To: ${to.join(', ')}`]
-    if (cc?.length) headerLines.push(`CC: ${cc.join(', ')}`)
+    if (cc?.length) headerLines.push(`Cc: ${cc.join(', ')}`)
     headerLines.push(`Subject: ${subject || task.title}`)
     const commentBody = `${headerLines.join('\n')}\n\n${body}`
     await admin
