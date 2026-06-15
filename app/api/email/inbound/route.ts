@@ -52,9 +52,25 @@ export async function POST(req: NextRequest) {
   }
 
   const data = event.data
+  console.log('[email/inbound] payload keys:', Object.keys(data))
+  console.log('[email/inbound] to:', data.to, '| from:', data.from, '| text length:', data.text?.length ?? 0, '| html length:', data.html?.length ?? 0)
+
   const toAddresses: string[] = Array.isArray(data.to) ? data.to : [data.to]
   const fromAddress: string = data.from ?? ''
-  const emailText: string = data.text ?? ''
+
+  // Use plain text body; fall back to HTML with tags stripped
+  let emailText: string = data.text ?? ''
+  if (!emailText && data.html) {
+    emailText = (data.html as string)
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+  }
 
   const domain = process.env.RESEND_RECEIVING_DOMAIN ?? 'task.codicocorp.com'
 
@@ -114,7 +130,11 @@ export async function POST(req: NextRequest) {
 
   // 7. Clean the email body
   const cleanBody = stripReplyChain(emailText)
-  if (!cleanBody) return NextResponse.json({ ok: true })
+  console.log('[email/inbound] cleanBody length:', cleanBody.length, '| preview:', cleanBody.slice(0, 100))
+  if (!cleanBody) {
+    console.warn('[email/inbound] Empty body after stripping — skipping comment insert')
+    return NextResponse.json({ ok: true })
+  }
 
   // 8. Identify sender — match against profiles, or store email as external
   const senderEmail = fromAddress.match(/<(.+)>/)?.[1] ?? fromAddress
