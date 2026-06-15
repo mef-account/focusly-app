@@ -86,6 +86,60 @@ function applyAction(
   })
 }
 
+// ─── Markdown preview with copy buttons on code blocks ───────────────────────
+
+function MarkdownPreview({ html, className }: { html: string; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const container = ref.current
+    if (!container) return
+
+    // Remove any copy buttons injected in a previous render
+    container.querySelectorAll('.code-copy-btn-wrapper').forEach((w) => {
+      const pre = w.querySelector('pre')
+      if (pre) w.replaceWith(pre)
+    })
+
+    // Inject a copy button into each <pre> block
+    container.querySelectorAll('pre').forEach((pre) => {
+      const wrapper = document.createElement('div')
+      wrapper.className = 'code-copy-btn-wrapper relative'
+      pre.replaceWith(wrapper)
+      wrapper.appendChild(pre)
+
+      const btn = document.createElement('button')
+      btn.type = 'button'
+      btn.textContent = 'Copy'
+      btn.className = [
+        'code-copy-btn',
+        'absolute top-2 right-2',
+        'rounded border border-border bg-background/80 backdrop-blur-sm',
+        'px-2 py-0.5 font-mono text-[11px] text-muted-foreground',
+        'hover:text-foreground hover:border-foreground/40 transition-colors',
+      ].join(' ')
+
+      btn.addEventListener('click', () => {
+        const code = pre.querySelector('code')?.innerText ?? pre.innerText
+        navigator.clipboard.writeText(code).then(() => {
+          btn.textContent = 'Copied!'
+          setTimeout(() => { btn.textContent = 'Copy' }, 1500)
+        })
+      })
+
+      wrapper.appendChild(btn)
+    })
+  }, [html])
+
+  return (
+    <div
+      ref={ref}
+      className={cn('prose prose-sm dark:prose-invert max-w-none flex-1 overflow-y-auto p-4', className)}
+      dangerouslySetInnerHTML={{ __html: html || '<p class="text-muted-foreground">Nothing to preview yet…</p>' }}
+    />
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 type ViewMode = 'edit' | 'split' | 'preview'
@@ -202,10 +256,7 @@ export function MarkdownEditor({ value, onChange, className, defaultMode = 'spli
 
         {/* Preview pane */}
         {(mode === 'preview' || mode === 'split') && (
-          <div
-            className="prose prose-sm dark:prose-invert max-w-none flex-1 overflow-y-auto p-4"
-            dangerouslySetInnerHTML={{ __html: html || '<p class="text-muted-foreground">Nothing to preview yet…</p>' }}
-          />
+          <MarkdownPreview html={html} />
         )}
       </div>
     </div>
