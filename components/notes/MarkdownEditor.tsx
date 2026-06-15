@@ -88,54 +88,53 @@ function applyAction(
 
 // ─── Markdown preview with copy buttons on code blocks ───────────────────────
 
+/** Wraps each <pre> block in the HTML string with a copy button. */
+function wrapCodeBlocks(html: string): string {
+  return html.replace(
+    /(<pre\b[^>]*>[\s\S]*?<\/pre>)/g,
+    '<div class="code-block-wrapper">$1<button class="code-copy-btn" type="button">Copy</button></div>'
+  )
+}
+
 function MarkdownPreview({ html, className }: { html: string; className?: string }) {
   const ref = useRef<HTMLDivElement>(null)
 
+  // Single delegated listener — survives re-renders because it's on the container
   useEffect(() => {
     const container = ref.current
     if (!container) return
 
-    // Remove any copy buttons injected in a previous render
-    container.querySelectorAll('.code-copy-btn-wrapper').forEach((w) => {
-      const pre = w.querySelector('pre')
-      if (pre) w.replaceWith(pre)
-    })
-
-    // Inject a copy button into each <pre> block
-    container.querySelectorAll('pre').forEach((pre) => {
-      const wrapper = document.createElement('div')
-      wrapper.className = 'code-copy-btn-wrapper relative'
-      pre.replaceWith(wrapper)
-      wrapper.appendChild(pre)
-
-      const btn = document.createElement('button')
-      btn.type = 'button'
-      btn.textContent = 'Copy'
-      btn.className = [
-        'code-copy-btn',
-        'absolute top-2 right-2',
-        'rounded border border-border bg-background/80 backdrop-blur-sm',
-        'px-2 py-0.5 font-mono text-[11px] text-muted-foreground',
-        'hover:text-foreground hover:border-foreground/40 transition-colors',
-      ].join(' ')
-
-      btn.addEventListener('click', () => {
-        const code = pre.querySelector('code')?.innerText ?? pre.innerText
-        navigator.clipboard.writeText(code).then(() => {
-          btn.textContent = 'Copied!'
-          setTimeout(() => { btn.textContent = 'Copy' }, 1500)
-        })
+    function handleClick(e: Event) {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.code-copy-btn')
+      if (!btn) return
+      const wrapper = btn.closest('.code-block-wrapper')
+      const text =
+        wrapper?.querySelector('code')?.innerText ??
+        wrapper?.querySelector('pre')?.innerText ??
+        ''
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'Copied!'
+        setTimeout(() => { btn.textContent = 'Copy' }, 1500)
       })
+    }
 
-      wrapper.appendChild(btn)
-    })
-  }, [html])
+    container.addEventListener('click', handleClick)
+    return () => container.removeEventListener('click', handleClick)
+  }, [])
+
+  const processedHtml = html
+    ? wrapCodeBlocks(html)
+    : '<p class="text-muted-foreground">Nothing to preview yet…</p>'
 
   return (
     <div
       ref={ref}
-      className={cn('prose prose-sm dark:prose-invert max-w-none flex-1 overflow-y-auto p-4', className)}
-      dangerouslySetInnerHTML={{ __html: html || '<p class="text-muted-foreground">Nothing to preview yet…</p>' }}
+      className={cn(
+        'prose prose-sm dark:prose-invert max-w-none flex-1 overflow-y-auto p-4',
+        '[&_pre]:text-sm [&_pre_code]:text-sm',
+        className
+      )}
+      dangerouslySetInnerHTML={{ __html: processedHtml }}
     />
   )
 }
