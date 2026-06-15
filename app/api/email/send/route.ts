@@ -45,7 +45,11 @@ export async function POST(req: NextRequest) {
       .eq('id', taskId)
       .single()
 
-    if (taskErr || !task) {
+    if (taskErr) {
+      console.error('[email/send] Task query error:', JSON.stringify(taskErr))
+      return NextResponse.json({ error: 'Database error', detail: taskErr.message }, { status: 500 })
+    }
+    if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
     }
 
