@@ -103,7 +103,7 @@ export function QuickCreateTaskDialog() {
       description: description.trim() || null,
       status,
       priority,
-      workspace_id: activeWorkspace?.id ?? null,
+      workspace_id: (projectId ? allProjects.find((p) => p.id === projectId)?.workspace_id : null) ?? activeWorkspace?.id ?? null,
       project_id: projectId,
       assignee_id: assigneeId,
       estimate_minutes: estimateMinutes,

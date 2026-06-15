@@ -108,12 +108,14 @@ function Column({
   col,
   tasks,
   projectId,
+  workspaceId,
   timeTotals,
   noteCounts,
 }: {
   col: { id: TaskStatus; label: string }
   tasks: Task[]
   projectId: string
+  workspaceId: string | null
   timeTotals: Record<string, number>
   noteCounts: Record<string, number>
 }) {
@@ -129,7 +131,7 @@ function Column({
     try {
       await createTask.mutateAsync({
         title,
-        workspace_id: activeWorkspaceId,
+        workspace_id: workspaceId ?? activeWorkspaceId,
         project_id: projectId,
         status: col.id,
         priority: 'none',
@@ -213,11 +215,12 @@ function Column({
 interface BoardViewProps {
   tasks: Task[]
   projectId: string
+  workspaceId?: string | null
   timeTotals?: Record<string, number>
   noteCounts?: Record<string, number>
 }
 
-export function BoardView({ tasks, projectId, timeTotals = {}, noteCounts = {} }: BoardViewProps) {
+export function BoardView({ tasks, projectId, workspaceId = null, timeTotals = {}, noteCounts = {} }: BoardViewProps) {
   const updateTask = useUpdateTask()
   const [activeTask, setActiveTask] = useState<Task | null>(null)
 
@@ -259,6 +262,7 @@ export function BoardView({ tasks, projectId, timeTotals = {}, noteCounts = {} }
             col={col}
             tasks={tasksByStatus[col.id] ?? []}
             projectId={projectId}
+            workspaceId={workspaceId}
             timeTotals={timeTotals}
             noteCounts={noteCounts}
           />

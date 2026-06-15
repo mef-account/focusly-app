@@ -52,7 +52,7 @@ export function QuickCreateTaskDialog({ open, onOpenChange, dueDate }: QuickCrea
 
     await createTask.mutateAsync({
       title: title.trim(),
-      workspace_id: activeWorkspaceId,
+      workspace_id: (projectId ? projects.find((p) => p.id === projectId)?.workspace_id : null) ?? activeWorkspaceId,
       project_id: projectId,
       status: 'todo',
       priority: 'none',

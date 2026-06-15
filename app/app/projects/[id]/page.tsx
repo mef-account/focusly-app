@@ -180,7 +180,7 @@ export default function ProjectDetailPage({ params }: PageProps) {
               ))}
             </div>
           ) : (
-            <BoardView tasks={tasks} projectId={id} timeTotals={timeTotals} noteCounts={noteCounts} />
+            <BoardView tasks={tasks} projectId={id} workspaceId={project?.workspace_id ?? null} timeTotals={timeTotals} noteCounts={noteCounts} />
           )}
         </TabsContent>
 
