@@ -24,6 +24,7 @@ import { useSidebarStore } from '@/store/useSidebarStore'
 import { useQuickCreateStore } from '@/store/useQuickCreateStore'
 import { useWorkspaceStore } from '@/store/useWorkspaceStore'
 import { useWorkspaces } from '@/lib/queries/useWorkspace'
+import { useIsViewer } from '@/lib/hooks/useCurrentUserRole'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
@@ -49,6 +50,7 @@ export function Sidebar() {
   const openQuickCreate = useQuickCreateStore((s) => s.open)
   const { activeWorkspaceId, setActiveWorkspace } = useWorkspaceStore()
   const { data: workspaces = [] } = useWorkspaces()
+  const isViewer = useIsViewer()
 
   // Auto-select first workspace if none stored yet
   useEffect(() => {
@@ -77,21 +79,23 @@ export function Sidebar() {
           <Zap className="h-5 w-5 shrink-0 text-brand-600" />
           {!collapsed && <span className="text-sm tracking-tight">Focusly</span>}
         </div>
-        <Tooltip>
-          <TooltipTrigger render={<span />}>
-            <button
-              onClick={() => openQuickCreate()}
-              className={cn(
-                'flex items-center justify-center rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-                collapsed && 'hidden'
-              )}
-              aria-label="New task"
-            >
-              <SquarePen className="h-4 w-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right">New task (C)</TooltipContent>
-        </Tooltip>
+        {!isViewer && (
+          <Tooltip>
+            <TooltipTrigger render={<span />}>
+              <button
+                onClick={() => openQuickCreate()}
+                className={cn(
+                  'flex items-center justify-center rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                  collapsed && 'hidden'
+                )}
+                aria-label="New task"
+              >
+                <SquarePen className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">New task (C)</TooltipContent>
+          </Tooltip>
+        )}
       </div>
 
       <Separator />

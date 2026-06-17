@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input'
 import { useUpdateTask, useCreateTask } from '@/lib/queries/useTasks'
 import { useTaskPanelStore } from '@/store/useTaskPanelStore'
 import { useWorkspaceStore } from '@/store/useWorkspaceStore'
+import { useIsViewer } from '@/lib/hooks/useCurrentUserRole'
 import { TaskTimerButton } from '@/components/tracker/TaskTimerButton'
 import { AssigneePicker } from '@/components/tasks/AssigneePicker'
 import { PRIORITY_CLASSES, PRIORITY_LABELS, formatDate, formatDuration, getTaskKey, cn } from '@/lib/utils'
@@ -122,6 +123,7 @@ function Column({
   const { setNodeRef, isOver } = useDroppable({ id: col.id })
   const createTask = useCreateTask()
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
+  const isViewer = useIsViewer()
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
 
@@ -159,14 +161,16 @@ function Column({
           <span className="text-sm font-semibold">{col.label}</span>
           <span className="text-xs text-muted-foreground">{tasks.length}</span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          onClick={() => setAdding(true)}
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </Button>
+        {!isViewer && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => setAdding(true)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        )}
       </div>
 
       <div
@@ -182,7 +186,7 @@ function Column({
           ))}
         </SortableContext>
 
-        {adding ? (
+        {!isViewer && (adding ? (
           <div className="rounded-lg border bg-card p-2">
             <Input
               autoFocus
@@ -204,7 +208,7 @@ function Column({
           >
             <Plus className="h-3.5 w-3.5" /> Add task
           </button>
-        )}
+        ))}
       </div>
     </div>
   )

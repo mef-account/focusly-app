@@ -15,7 +15,7 @@ import type { Profile } from '@/types'
 interface AssigneePickerProps {
   value: string | null
   assignee?: Profile | null
-  onChange: (assigneeId: string | null) => void
+  onChange?: (assigneeId: string | null) => void
   variant?: 'compact' | 'full'
   /** Prevents the click from bubbling to a parent (e.g. board card / table row). */
   stopPropagation?: boolean
@@ -89,14 +89,14 @@ export function AssigneePicker({
 
       <DropdownMenuContent align="start" className="w-48" onClick={stop}>
         {profiles.map((p) => (
-          <DropdownMenuItem key={p.id} onClick={(e) => { stop(e); onChange(p.id) }}>
+          <DropdownMenuItem key={p.id} onClick={(e) => { stop(e); onChange?.(p.id) }}>
             <AssigneeAvatar profile={p} />
             <span className="truncate">{p.name ?? 'Unnamed'}</span>
             {value === p.id && <Check className="ml-auto h-3.5 w-3.5" />}
           </DropdownMenuItem>
         ))}
         {value && (
-          <DropdownMenuItem onClick={(e) => { stop(e); onChange(null) }}>
+          <DropdownMenuItem onClick={(e) => { stop(e); onChange?.(null) }}>
             <span className="flex h-5 w-5 items-center justify-center text-muted-foreground">
               <X className="h-3.5 w-3.5" />
             </span>

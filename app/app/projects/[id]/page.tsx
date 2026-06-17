@@ -15,6 +15,7 @@ import { useTimeTotalsByTask } from '@/lib/queries/useTimeEntries'
 import { useNoteCountsByTask, useNotesByProject, useCreateNote } from '@/lib/queries/useNotes'
 import { useNotePanelStore } from '@/store/useNotePanelStore'
 import { useQuickCreateStore } from '@/store/useQuickCreateStore'
+import { useIsViewer } from '@/lib/hooks/useCurrentUserRole'
 import { formatDate } from '@/lib/utils'
 
 interface PageProps {
@@ -35,6 +36,7 @@ export default function ProjectDetailPage({ params }: PageProps) {
   const createNote = useCreateNote()
   const openNote = useNotePanelStore((s) => s.openNote)
   const openQuickCreate = useQuickCreateStore((s) => s.open)
+  const isViewer = useIsViewer()
 
   const view = (searchParams.get('view') ?? 'list') as 'board' | 'list'
 
@@ -118,19 +120,23 @@ export default function ProjectDetailPage({ params }: PageProps) {
               )}
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => openQuickCreate({ projectId: id, workspaceId: project?.workspace_id ?? null })}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <SquarePen className="h-3.5 w-3.5" /> New task
-              </button>
-              <button
-                onClick={handleNewNote}
-                disabled={createNote.isPending}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Plus className="h-3.5 w-3.5" /> New note
-              </button>
+              {!isViewer && (
+                <button
+                  onClick={() => openQuickCreate({ projectId: id, workspaceId: project?.workspace_id ?? null })}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <SquarePen className="h-3.5 w-3.5" /> New task
+                </button>
+              )}
+              {!isViewer && (
+                <button
+                  onClick={handleNewNote}
+                  disabled={createNote.isPending}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" /> New note
+                </button>
+              )}
             </div>
           </div>
 

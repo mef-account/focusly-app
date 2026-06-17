@@ -47,6 +47,7 @@ import { useNotePanelStore } from '@/store/useNotePanelStore'
 import { useProjects } from '@/lib/queries/useProjects'
 import { useWorkspaces } from '@/lib/queries/useWorkspace'
 import { usePortfolios } from '@/lib/queries/usePortfolios'
+import { useIsViewer } from '@/lib/hooks/useCurrentUserRole'
 import { TaskTimerButton } from '@/components/tracker/TaskTimerButton'
 import { AssigneePicker } from '@/components/tasks/AssigneePicker'
 import { createClient } from '@/lib/supabase/client'
@@ -232,6 +233,7 @@ export function TaskSheet() {
   const { activeTaskId, close } = useTaskPanelStore()
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
+  const isViewer = useIsViewer()
 
   const { data: allProjects = [] } = useProjects()
   const { data: workspaces = [] } = useWorkspaces()
@@ -706,8 +708,8 @@ export function TaskSheet() {
                   })}
                 </div>
 
-                {/* Compose toggle tabs */}
-                <div className="mt-4">
+                {/* Compose toggle tabs — hidden for viewers */}
+                {!isViewer && <div className="mt-4">
                   <div className="flex gap-1 mb-3">
                     <button
                       onClick={() => setComposeMode('comment')}
@@ -803,7 +805,7 @@ export function TaskSheet() {
                       </div>
                     </div>
                   )}
-                </div>
+                </div>}
               </div>
 
             </div>
@@ -943,13 +945,15 @@ export function TaskSheet() {
             </Box>
 
             {/* Delete */}
-            <button
-              onClick={() => setConfirmDeleteOpen(true)}
-              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors mt-auto"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Delete task
-            </button>
+            {!isViewer && (
+              <button
+                onClick={() => setConfirmDeleteOpen(true)}
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors mt-auto"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete task
+              </button>
+            )}
 
           </div>
         </div>

@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useUpdateTask, useDeleteTask } from '@/lib/queries/useTasks'
 import { useTaskPanelStore } from '@/store/useTaskPanelStore'
+import { useIsViewer } from '@/lib/hooks/useCurrentUserRole'
 import { TaskTimerButton } from '@/components/tracker/TaskTimerButton'
 import { AssigneePicker } from '@/components/tasks/AssigneePicker'
 import { StatusIcon } from '@/components/tasks/StatusIcon'
@@ -95,6 +96,7 @@ export function ListView({
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
   const { open } = useTaskPanelStore()
+  const isViewer = useIsViewer()
 
   // Pre-sort: done/cancelled last → priority → created_at newest first
   const sortedTasks = useMemo(() => {
@@ -153,6 +155,14 @@ export function ListView({
       meta: { className: 'px-2' },
       cell: ({ row }) => {
         const s = row.original.status
+        if (isViewer) {
+          return (
+            <span className="flex items-center gap-1.5 px-1.5 py-0.5">
+              <StatusIcon status={s} />
+              <span className="text-xs text-muted-foreground">{STATUS_LABELS[s]}</span>
+            </span>
+          )
+        }
         return (
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -236,7 +246,7 @@ export function ListView({
           value={row.original.assignee_id}
           assignee={row.original.assignee}
           stopPropagation
-          onChange={(id) => updateTask.mutate({ id: row.original.id, assignee_id: id })}
+          onChange={isViewer ? undefined : (id) => updateTask.mutate({ id: row.original.id, assignee_id: id })}
         />
       ),
       enableSorting: false,
@@ -247,6 +257,14 @@ export function ListView({
       size: 110,
       cell: ({ row }) => {
         const p = row.original.priority
+        if (isViewer) {
+          return (
+            <span className="flex items-center gap-1.5 px-1.5 py-0.5">
+              <PriorityIcon priority={p} />
+              <span className="text-xs text-muted-foreground">{PRIORITY_LABELS[p]}</span>
+            </span>
+          )
+        }
         return (
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -288,6 +306,14 @@ export function ListView({
       cell: ({ row }) => {
         const due = row.original.due_date
         const overdue = isOverdue(due)
+        if (isViewer) {
+          return (
+            <span className={cn('flex items-center gap-1 px-1 py-0.5 text-xs tabular-nums', overdue ? 'font-medium text-red-500' : 'text-muted-foreground')}>
+              <CalendarIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
+              {due ? format(parseISO(due), 'MMM d') : '—'}
+            </span>
+          )
+        }
         // eslint-disable-next-line react-hooks/rules-of-hooks
         const [open, setOpen] = useState(false)
         return (
@@ -334,6 +360,13 @@ export function ListView({
       header: 'Estimate',
       size: 100,
       cell: ({ row }) => {
+        if (isViewer) {
+          return (
+            <span className="px-1 py-0.5 text-xs text-muted-foreground tabular-nums">
+              {row.original.estimate_minutes ? formatMinutes(row.original.estimate_minutes) : '—'}
+            </span>
+          )
+        }
         // eslint-disable-next-line react-hooks/rules-of-hooks
         const [editing, setEditing] = useState(false)
         // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -428,7 +461,7 @@ export function ListView({
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="h-8 max-w-xs text-sm"
         />
-        {selectedIds.length > 0 && (
+        {!isViewer && selectedIds.length > 0 && (
           <div className="ml-auto flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5">
             <span className="text-xs text-muted-foreground">{selectedIds.length} selected</span>
             <DropdownMenu>

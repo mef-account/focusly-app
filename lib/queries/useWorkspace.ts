@@ -27,10 +27,10 @@ export function useWorkspaces() {
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return []
+      // Return all workspaces the user owns OR is a member of (RLS handles filtering)
       const { data, error } = await supabase
         .from('workspaces')
         .select('*')
-        .eq('owner_id', user.id)
         .order('created_at', { ascending: true })
       if (error) throw error
       return data as Workspace[]
