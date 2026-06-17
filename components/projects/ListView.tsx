@@ -503,7 +503,7 @@ export function ListView({
             ))}
           </thead>
           <tbody>
-            {table.getRowModel().rows.length === 0 && !addingTask ? (
+            {table.getRowModel().rows.length === 0 ? (
               <tr>
                 <td colSpan={colCount} className="py-10 text-center text-muted-foreground">
                   No tasks yet
