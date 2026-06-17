@@ -1,52 +1,42 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspaceStore } from '@/store/useWorkspaceStore'
-
-const supabase = createClient()
+import { useWorkspaces } from '@/lib/queries/useWorkspace'
 
 /**
  * Returns the current user's role in the active workspace.
  * 'admin'  — user owns the workspace
  * 'viewer' — user is an invited member
- * null     — loading or no workspace
+ * null     — still loading
  */
 export function useCurrentUserRole(): 'admin' | 'viewer' | null {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
+  const { data: workspaces = [], isLoading } = useWorkspaces()
+  const [userId, setUserId] = useState<string | null>(null)
 
-  const { data } = useQuery({
-    queryKey: ['user-role', activeWorkspaceId],
-    queryFn: async () => {
-      if (!activeWorkspaceId) return null
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return null
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id ?? null)
+    })
+  }, [])
 
-      // Check if user owns the workspace
-      const { data: owned } = await supabase
-        .from('workspaces')
-        .select('id')
-        .eq('id', activeWorkspaceId)
-        .eq('owner_id', user.id)
-        .maybeSingle()
-      if (owned) return 'admin' as const
+  if (isLoading || !userId || !activeWorkspaceId) return null
 
-      // Check workspace_members
-      const { data: membership } = await supabase
-        .from('workspace_members')
-        .select('role')
-        .eq('workspace_id', activeWorkspaceId)
-        .eq('user_id', user.id)
-        .maybeSingle()
-      if (membership) return membership.role as 'admin' | 'viewer'
+  // Check if user owns the active workspace
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
+  if (activeWorkspace && activeWorkspace.owner_id === userId) return 'admin'
 
-      return null
-    },
-    enabled: !!activeWorkspaceId,
-    staleTime: 60_000,
-  })
+  // If user has any workspaces and owns at least one, they are admin globally
+  const ownsAny = workspaces.some((w) => w.owner_id === userId)
+  if (ownsAny) return 'admin'
 
-  return data ?? null
+  // User is in the workspaces list but doesn't own any → viewer
+  if (workspaces.length > 0) return 'viewer'
+
+  return null
 }
 
 /** Convenience hook — true when the user is a read-only viewer */
