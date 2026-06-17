@@ -36,7 +36,7 @@ const STATUSES: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'done']
 const PRIORITIES: TaskPriority[] = ['urgent', 'high', 'medium', 'low', 'none']
 
 export function QuickCreateTaskDialog() {
-  const { isOpen, close } = useQuickCreateStore()
+  const { isOpen, close, defaultProjectId, defaultWorkspaceId } = useQuickCreateStore()
   const createTask = useCreateTask()
   const { data: allProjects = [] } = useProjects()
   const { data: workspaces = [] } = useWorkspaces()
@@ -67,12 +67,14 @@ export function QuickCreateTaskDialog() {
 
   const titleRef = useRef<HTMLInputElement>(null)
 
-  // Focus title on open
+  // Pre-fill workspace and project when opened from a project context
   useEffect(() => {
     if (isOpen) {
+      if (defaultWorkspaceId) setActiveWorkspace(defaultWorkspaceId)
+      if (defaultProjectId) setProjectId(defaultProjectId)
       setTimeout(() => titleRef.current?.focus(), 50)
     }
-  }, [isOpen])
+  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset project if it no longer belongs to the newly selected workspace
   useEffect(() => {

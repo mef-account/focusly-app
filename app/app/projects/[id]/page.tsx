@@ -2,7 +2,7 @@
 
 import { use, useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Plus, FileText, Maximize2 } from 'lucide-react'
+import { Plus, FileText, Maximize2, SquarePen } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -14,6 +14,7 @@ import { useTasks } from '@/lib/queries/useTasks'
 import { useTimeTotalsByTask } from '@/lib/queries/useTimeEntries'
 import { useNoteCountsByTask, useNotesByProject, useCreateNote } from '@/lib/queries/useNotes'
 import { useNotePanelStore } from '@/store/useNotePanelStore'
+import { useQuickCreateStore } from '@/store/useQuickCreateStore'
 import { formatDate } from '@/lib/utils'
 
 interface PageProps {
@@ -33,6 +34,7 @@ export default function ProjectDetailPage({ params }: PageProps) {
   const updateProject = useUpdateProject()
   const createNote = useCreateNote()
   const openNote = useNotePanelStore((s) => s.openNote)
+  const openQuickCreate = useQuickCreateStore((s) => s.open)
 
   const view = (searchParams.get('view') ?? 'list') as 'board' | 'list'
 
@@ -115,13 +117,21 @@ export default function ProjectDetailPage({ params }: PageProps) {
                 <span className="text-xs text-muted-foreground">({projectNotes.length})</span>
               )}
             </div>
-            <button
-              onClick={handleNewNote}
-              disabled={createNote.isPending}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Plus className="h-3.5 w-3.5" /> New note
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => openQuickCreate({ projectId: id, workspaceId: project?.workspace_id ?? null })}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <SquarePen className="h-3.5 w-3.5" /> New task
+              </button>
+              <button
+                onClick={handleNewNote}
+                disabled={createNote.isPending}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" /> New note
+              </button>
+            </div>
           </div>
 
           {projectNotes.length > 0 && (
@@ -188,7 +198,7 @@ export default function ProjectDetailPage({ params }: PageProps) {
           {tasksLoading ? (
             <Skeleton className="h-64 w-full rounded-xl" />
           ) : (
-            <ListView tasks={tasks} timeTotals={timeTotals} noteCounts={noteCounts} persistKey={`focusly:list-col-sizing:${id}`} projectId={id} workspaceId={project?.workspace_id ?? null} />
+            <ListView tasks={tasks} timeTotals={timeTotals} noteCounts={noteCounts} persistKey={`focusly:list-col-sizing:${id}`} />
           )}
         </TabsContent>
 

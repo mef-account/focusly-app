@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -11,7 +11,7 @@ import {
   type SortingState,
   type ColumnSizingState,
 } from '@tanstack/react-table'
-import { ArrowUpDown, Trash2, ChevronDown, FileText, Check, CalendarIcon, X, Plus } from 'lucide-react'
+import { ArrowUpDown, Trash2, ChevronDown, FileText, Check, CalendarIcon, X } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,9 +24,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useUpdateTask, useDeleteTask, useCreateTask } from '@/lib/queries/useTasks'
+import { useUpdateTask, useDeleteTask } from '@/lib/queries/useTasks'
 import { useTaskPanelStore } from '@/store/useTaskPanelStore'
-import { useWorkspaceStore } from '@/store/useWorkspaceStore'
 import { TaskTimerButton } from '@/components/tracker/TaskTimerButton'
 import { AssigneePicker } from '@/components/tasks/AssigneePicker'
 import { StatusIcon } from '@/components/tasks/StatusIcon'
@@ -61,8 +60,6 @@ interface ListViewProps {
   noteCounts?: Record<string, number>
   persistKey?: string
   showProject?: boolean
-  projectId?: string | null
-  workspaceId?: string | null
 }
 
 export function ListView({
@@ -71,46 +68,11 @@ export function ListView({
   noteCounts = {},
   persistKey = 'focusly:list-col-sizing',
   showProject = false,
-  projectId = null,
-  workspaceId = null,
 }: ListViewProps) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({})
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({})
-
-  // Add task inline state
-  const [addingTask, setAddingTask] = useState(false)
-  const [newTitle, setNewTitle] = useState('')
-  const addInputRef = useRef<HTMLInputElement>(null)
-  const createTask = useCreateTask()
-  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
-
-  useEffect(() => {
-    if (addingTask) addInputRef.current?.focus()
-  }, [addingTask])
-
-  async function handleAddTask() {
-    const title = newTitle.trim()
-    setAddingTask(false)
-    setNewTitle('')
-    if (!title || createTask.isPending) return
-    await createTask.mutateAsync({
-      title,
-      workspace_id: workspaceId ?? activeWorkspaceId,
-      project_id: projectId,
-      status: 'backlog',
-      priority: 'none',
-      description: null,
-      assignee_id: null,
-      estimate_minutes: null,
-      due_date: null,
-      parent_task_id: null,
-      created_by: null,
-      start_date: null,
-      scheduled_start: null,
-    })
-  }
 
   // Load saved column widths
   useEffect(() => {
@@ -570,36 +532,6 @@ export function ListView({
               ))
             )}
 
-            {/* Add task row */}
-            {addingTask ? (
-              <tr className="border-b last:border-0">
-                <td colSpan={colCount} className="h-8 px-3">
-                  <input
-                    ref={addInputRef}
-                    className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
-                    placeholder="Task title…"
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    onBlur={handleAddTask}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleAddTask()
-                      if (e.key === 'Escape') { setAddingTask(false); setNewTitle('') }
-                    }}
-                  />
-                </td>
-              </tr>
-            ) : (
-              <tr>
-                <td colSpan={colCount} className="h-8 px-3">
-                  <button
-                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    onClick={() => setAddingTask(true)}
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Add task
-                  </button>
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>
