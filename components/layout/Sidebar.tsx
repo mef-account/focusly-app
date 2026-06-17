@@ -80,7 +80,7 @@ export function Sidebar() {
         <Tooltip>
           <TooltipTrigger render={<span />}>
             <button
-              onClick={openQuickCreate}
+              onClick={() => openQuickCreate()}
               className={cn(
                 'flex items-center justify-center rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
                 collapsed && 'hidden'
