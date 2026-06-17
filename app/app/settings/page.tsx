@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Users, UserPlus, FolderKanban, X, ChevronDown, ChevronRight, Check, Loader2, Shield, User } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -57,9 +57,26 @@ export default function SettingsPage() {
 // ─── Account Tab ──────────────────────────────────────────────────────────────
 
 function AccountTab() {
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    import('@/lib/supabase/client').then(({ createClient }) => {
+      createClient().auth.getUser().then(({ data }) => {
+        setUserEmail(data.user?.email ?? null)
+        setUserId(data.user?.id ?? null)
+      })
+    })
+  }, [])
+
   return (
-    <div className="space-y-4 text-sm text-muted-foreground">
-      <p>Account settings coming soon.</p>
+    <div className="space-y-4 rounded-lg border border-border p-4 text-sm">
+      <h3 className="font-semibold">Logged in as</h3>
+      <div className="space-y-1 text-muted-foreground">
+        <p>Email: <span className="text-foreground font-medium">{userEmail ?? '…'}</span></p>
+        <p className="text-xs font-mono break-all">ID: {userId ?? '…'}</p>
+      </div>
     </div>
   )
 }
