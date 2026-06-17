@@ -775,6 +775,7 @@ export function TaskSheet() {
                         <input
                           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
                           placeholder={task.title}
+                          spellCheck={true}
                           value={emailSubject}
                           onChange={(e) => setEmailSubject(e.target.value)}
                         />
@@ -782,6 +783,7 @@ export function TaskSheet() {
                       <textarea
                         className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/60 resize-none min-h-[80px]"
                         placeholder="Write your message…"
+                        spellCheck={true}
                         value={emailBody}
                         onChange={(e) => setEmailBody(e.target.value)}
                       />

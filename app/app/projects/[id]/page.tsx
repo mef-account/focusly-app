@@ -34,7 +34,7 @@ export default function ProjectDetailPage({ params }: PageProps) {
   const createNote = useCreateNote()
   const openNote = useNotePanelStore((s) => s.openNote)
 
-  const view = (searchParams.get('view') ?? 'board') as 'board' | 'list'
+  const view = (searchParams.get('view') ?? 'list') as 'board' | 'list'
 
   function setView(v: string) {
     router.replace(`/app/projects/${id}?view=${v}`)
@@ -188,7 +188,7 @@ export default function ProjectDetailPage({ params }: PageProps) {
           {tasksLoading ? (
             <Skeleton className="h-64 w-full rounded-xl" />
           ) : (
-            <ListView tasks={tasks} timeTotals={timeTotals} noteCounts={noteCounts} persistKey={`focusly:list-col-sizing:${id}`} />
+            <ListView tasks={tasks} timeTotals={timeTotals} noteCounts={noteCounts} persistKey={`focusly:list-col-sizing:${id}`} projectId={id} workspaceId={project?.workspace_id ?? null} />
           )}
         </TabsContent>
 

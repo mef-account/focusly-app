@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -11,18 +11,22 @@ import {
   type SortingState,
   type ColumnSizingState,
 } from '@tanstack/react-table'
-import { ArrowUpDown, Trash2, ChevronDown, FileText, Check } from 'lucide-react'
+import { ArrowUpDown, Trash2, ChevronDown, FileText, Check, CalendarIcon, X, Plus } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useUpdateTask, useDeleteTask } from '@/lib/queries/useTasks'
+import { useUpdateTask, useDeleteTask, useCreateTask } from '@/lib/queries/useTasks'
 import { useTaskPanelStore } from '@/store/useTaskPanelStore'
+import { useWorkspaceStore } from '@/store/useWorkspaceStore'
 import { TaskTimerButton } from '@/components/tracker/TaskTimerButton'
 import { AssigneePicker } from '@/components/tasks/AssigneePicker'
 import { StatusIcon } from '@/components/tasks/StatusIcon'
@@ -33,6 +37,7 @@ import {
   formatDate,
   formatMinutes,
   formatDuration,
+  parseEstimate,
   getTaskKey,
   cn,
 } from '@/lib/utils'
@@ -41,14 +46,23 @@ import type { Task, TaskStatus, TaskPriority } from '@/types'
 const STATUSES: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'done', 'cancelled']
 const PRIORITIES: TaskPriority[] = ['urgent', 'high', 'medium', 'low', 'none']
 
+const PRIORITY_ORDER: Record<string, number> = {
+  urgent: 0, high: 1, medium: 2, low: 3, none: 4,
+}
+
+function isOverdue(due: string | null | undefined): boolean {
+  if (!due) return false
+  return new Date(due + 'T00:00:00') < new Date(new Date().toDateString())
+}
+
 interface ListViewProps {
   tasks: Task[]
   timeTotals?: Record<string, number>
   noteCounts?: Record<string, number>
-  /** localStorage key used to persist column widths. */
   persistKey?: string
-  /** Show the project column (useful in cross-project views). */
   showProject?: boolean
+  projectId?: string | null
+  workspaceId?: string | null
 }
 
 export function ListView({
@@ -57,13 +71,48 @@ export function ListView({
   noteCounts = {},
   persistKey = 'focusly:list-col-sizing',
   showProject = false,
+  projectId = null,
+  workspaceId = null,
 }: ListViewProps) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({})
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({})
 
-  // Load saved column widths on mount (per persistKey)
+  // Add task inline state
+  const [addingTask, setAddingTask] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+  const addInputRef = useRef<HTMLInputElement>(null)
+  const createTask = useCreateTask()
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
+
+  useEffect(() => {
+    if (addingTask) addInputRef.current?.focus()
+  }, [addingTask])
+
+  async function handleAddTask() {
+    const title = newTitle.trim()
+    setAddingTask(false)
+    setNewTitle('')
+    if (!title || createTask.isPending) return
+    await createTask.mutateAsync({
+      title,
+      workspace_id: workspaceId ?? activeWorkspaceId,
+      project_id: projectId,
+      status: 'backlog',
+      priority: 'none',
+      description: null,
+      assignee_id: null,
+      estimate_minutes: null,
+      due_date: null,
+      parent_task_id: null,
+      created_by: null,
+      start_date: null,
+      scheduled_start: null,
+    })
+  }
+
+  // Load saved column widths
   useEffect(() => {
     try {
       const raw = localStorage.getItem(persistKey)
@@ -73,21 +122,29 @@ export function ListView({
     }
   }, [persistKey])
 
-  // Persist only when the user actually resizes (avoids overwriting on mount)
   const handleColumnSizingChange = (updater: ColumnSizingState | ((old: ColumnSizingState) => ColumnSizingState)) => {
     setColumnSizing((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater
-      try {
-        localStorage.setItem(persistKey, JSON.stringify(next))
-      } catch {
-        /* ignore quota / unavailable storage */
-      }
+      try { localStorage.setItem(persistKey, JSON.stringify(next)) } catch { /* ignore */ }
       return next
     })
   }
+
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
   const { open } = useTaskPanelStore()
+
+  // Pre-sort: done/cancelled last → priority → created_at newest first
+  const sortedTasks = useMemo(() => {
+    return [...tasks].sort((a, b) => {
+      const aFinished = a.status === 'done' || a.status === 'cancelled'
+      const bFinished = b.status === 'done' || b.status === 'cancelled'
+      if (aFinished !== bFinished) return aFinished ? 1 : -1
+      const pd = (PRIORITY_ORDER[a.priority ?? 'none'] ?? 4) - (PRIORITY_ORDER[b.priority ?? 'none'] ?? 4)
+      if (pd !== 0) return pd
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    })
+  }, [tasks])
 
   const columns: ColumnDef<Task>[] = [
     {
@@ -128,10 +185,10 @@ export function ListView({
     },
     {
       id: 'status',
-      header: '',
-      size: 44,
-      enableResizing: false,
-      meta: { className: 'text-center px-1.5' },
+      header: 'Status',
+      size: 120,
+      enableResizing: true,
+      meta: { className: 'px-2' },
       cell: ({ row }) => {
         const s = row.original.status
         return (
@@ -141,11 +198,12 @@ export function ListView({
                 <button
                   title={STATUS_LABELS[s]}
                   onClick={(e) => e.stopPropagation()}
-                  className="flex h-6 w-6 items-center justify-center rounded hover:bg-accent transition-colors"
+                  className="flex items-center gap-1.5 rounded px-1.5 py-0.5 hover:bg-accent transition-colors"
                 />
               }
             >
               <StatusIcon status={s} />
+              <span className="text-xs text-muted-foreground">{STATUS_LABELS[s]}</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               {STATUSES.map((st) => (
@@ -166,11 +224,11 @@ export function ListView({
     },
     {
       accessorKey: 'title',
-      size: 340,
+      size: 320,
       minSize: 160,
       header: ({ column }) => (
         <Button variant="ghost" size="sm" className="-ml-2.5 h-7 gap-1 px-1 text-[11px] uppercase tracking-wide" onClick={() => column.toggleSorting()}>
-          Title <ArrowUpDown className="h-3 w-3" />
+          Task <ArrowUpDown className="h-3 w-3" />
         </Button>
       ),
       cell: ({ row }) => {
@@ -208,9 +266,24 @@ export function ListView({
       enableSorting: false,
     } as ColumnDef<Task>] : []),
     {
+      accessorKey: 'assignee',
+      header: 'Assignee',
+      size: 120,
+      cell: ({ row }) => (
+        <AssigneePicker
+          value={row.original.assignee_id}
+          assignee={row.original.assignee}
+          stopPropagation
+          onChange={(id) => updateTask.mutate({ id: row.original.id, assignee_id: id })}
+        />
+      ),
+      enableSorting: false,
+    },
+    {
       accessorKey: 'priority',
       header: 'Priority',
-      size: 96,      cell: ({ row }) => {
+      size: 110,
+      cell: ({ row }) => {
         const p = row.original.priority
         return (
           <DropdownMenu>
@@ -219,11 +292,12 @@ export function ListView({
                 <button
                   title={PRIORITY_LABELS[p]}
                   onClick={(e) => e.stopPropagation()}
-                  className="flex h-6 w-6 items-center justify-center rounded hover:bg-accent transition-colors"
+                  className="flex items-center gap-1.5 rounded px-1.5 py-0.5 hover:bg-accent transition-colors"
                 />
               }
             >
               <PriorityIcon priority={p} />
+              <span className="text-xs text-muted-foreground">{PRIORITY_LABELS[p]}</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               {PRIORITIES.map((pr) => (
@@ -242,40 +316,99 @@ export function ListView({
       },
     },
     {
-      id: 'assignee',
-      header: 'Assignee',
-      size: 120,
-      cell: ({ row }) => (
-        <AssigneePicker
-          value={row.original.assignee_id}
-          assignee={row.original.assignee}
-          stopPropagation
-          onChange={(id) => updateTask.mutate({ id: row.original.id, assignee_id: id })}
-        />
-      ),
-      enableSorting: false,
-    },
-    {
       accessorKey: 'due_date',
       size: 120,
       header: ({ column }) => (
         <Button variant="ghost" size="sm" className="-ml-2.5 h-7 gap-1 px-1 text-[11px] uppercase tracking-wide" onClick={() => column.toggleSorting()}>
-          Due <ArrowUpDown className="h-3 w-3" />
+          Due date <ArrowUpDown className="h-3 w-3" />
         </Button>
       ),
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">{formatDate(row.original.due_date)}</span>
-      ),
+      cell: ({ row }) => {
+        const due = row.original.due_date
+        const overdue = isOverdue(due)
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const [open, setOpen] = useState(false)
+        return (
+          <div onClick={(e) => e.stopPropagation()}>
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger
+                render={
+                  <button className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-xs hover:bg-accent transition-colors" />
+                }
+              >
+                <CalendarIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
+                <span className={cn('tabular-nums', overdue ? 'font-medium text-red-500' : 'text-muted-foreground')}>
+                  {due ? format(parseISO(due), 'MMM d') : '—'}
+                </span>
+                {due && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className="ml-auto text-muted-foreground hover:text-foreground"
+                    onClick={(e) => { e.stopPropagation(); updateTask.mutate({ id: row.original.id, due_date: null }) }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); updateTask.mutate({ id: row.original.id, due_date: null }) } }}
+                  >
+                    <X className="h-3 w-3" />
+                  </span>
+                )}
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={due ? parseISO(due) : undefined}
+                  onSelect={(date) => {
+                    updateTask.mutate({ id: row.original.id, due_date: date ? format(date, 'yyyy-MM-dd') : null })
+                    setOpen(false)
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        )
+      },
     },
     {
       accessorKey: 'estimate_minutes',
       header: 'Estimate',
       size: 100,
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">
-          {row.original.estimate_minutes ? formatMinutes(row.original.estimate_minutes) : '—'}
-        </span>
-      ),
+      cell: ({ row }) => {
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const [editing, setEditing] = useState(false)
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const [val, setVal] = useState('')
+        return (
+          <div onClick={(e) => e.stopPropagation()}>
+            {editing ? (
+              <input
+                autoFocus
+                className="w-full bg-transparent text-xs outline-none border-b border-primary tabular-nums text-foreground"
+                value={val}
+                onChange={(e) => setVal(e.target.value)}
+                onBlur={() => {
+                  const mins = val.trim() ? parseEstimate(val) : null
+                  updateTask.mutate({ id: row.original.id, estimate_minutes: mins })
+                  setEditing(false)
+                  setVal('')
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                  if (e.key === 'Escape') { setEditing(false); setVal('') }
+                }}
+              />
+            ) : (
+              <button
+                className="w-full text-left text-xs text-muted-foreground tabular-nums hover:bg-accent rounded px-1 py-0.5 transition-colors"
+                onClick={() => {
+                  setVal(row.original.estimate_minutes ? formatMinutes(row.original.estimate_minutes) : '')
+                  setEditing(true)
+                }}
+              >
+                {row.original.estimate_minutes ? formatMinutes(row.original.estimate_minutes) : '—'}
+              </button>
+            )}
+          </div>
+        )
+      },
     },
     {
       id: 'logged',
@@ -302,7 +435,7 @@ export function ListView({
   ]
 
   const table = useReactTable({
-    data: tasks,
+    data: sortedTasks,
     columns,
     state: { sorting, globalFilter, rowSelection, columnSizing },
     onSortingChange: setSorting,
@@ -319,7 +452,9 @@ export function ListView({
   })
 
   const selectedIds = Object.keys(rowSelection).filter((k) => rowSelection[k])
-    .map((i) => tasks[parseInt(i)]?.id).filter(Boolean)
+    .map((i) => sortedTasks[parseInt(i)]?.id).filter(Boolean)
+
+  const colCount = columns.length
 
   return (
     <div className="space-y-2">
@@ -406,9 +541,9 @@ export function ListView({
             ))}
           </thead>
           <tbody>
-            {table.getRowModel().rows.length === 0 ? (
+            {table.getRowModel().rows.length === 0 && !addingTask ? (
               <tr>
-                <td colSpan={columns.length} className="py-10 text-center text-muted-foreground">
+                <td colSpan={colCount} className="py-10 text-center text-muted-foreground">
                   No tasks yet
                 </td>
               </tr>
@@ -433,6 +568,37 @@ export function ListView({
                   ))}
                 </tr>
               ))
+            )}
+
+            {/* Add task row */}
+            {addingTask ? (
+              <tr className="border-b last:border-0">
+                <td colSpan={colCount} className="h-8 px-3">
+                  <input
+                    ref={addInputRef}
+                    className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
+                    placeholder="Task title…"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    onBlur={handleAddTask}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleAddTask()
+                      if (e.key === 'Escape') { setAddingTask(false); setNewTitle('') }
+                    }}
+                  />
+                </td>
+              </tr>
+            ) : (
+              <tr>
+                <td colSpan={colCount} className="h-8 px-3">
+                  <button
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => setAddingTask(true)}
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add task
+                  </button>
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
