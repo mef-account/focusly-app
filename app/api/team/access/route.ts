@@ -6,7 +6,9 @@ async function verifyOwner(workspaceId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
-  const { data: workspace } = await supabase
+  // Use admin client to bypass RLS for ownership check
+  const adminClient = createAdminClient()
+  const { data: workspace } = await adminClient
     .from('workspaces')
     .select('id')
     .eq('id', workspaceId)

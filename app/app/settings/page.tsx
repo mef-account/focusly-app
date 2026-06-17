@@ -255,6 +255,7 @@ function ManageAccessDialog({
   const [selected, setSelected] = useState<Set<string>>(new Set(member.project_ids))
   const [expanded, setExpanded] = useState<Set<string>>(new Set(wsPortfolios.map((p) => p.id)))
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const unassigned = wsProjects.filter((p) => !p.portfolio_id)
 
@@ -295,9 +296,12 @@ function ManageAccessDialog({
 
   async function handleSave() {
     setSaving(true)
+    setSaveError(null)
     try {
       await updateAccess.mutateAsync({ userId: member.user_id, projectIds: Array.from(selected) })
       onClose()
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save access')
     } finally {
       setSaving(false)
     }
@@ -408,6 +412,9 @@ function ManageAccessDialog({
           )}
         </div>
 
+        {saveError && (
+          <p className="mt-3 text-xs text-destructive">{saveError}</p>
+        )}
         <div className="mt-4 flex justify-end gap-2 border-t border-border pt-4">
           <Button variant="outline" size="sm" onClick={onClose}>
             Cancel

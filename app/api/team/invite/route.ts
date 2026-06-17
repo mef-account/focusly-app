@@ -14,7 +14,8 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: workspace, error: wsError } = await supabase
+    const adminClient = createAdminClient()
+    const { data: workspace, error: wsError } = await adminClient
       .from('workspaces')
       .select('id, owner_id')
       .eq('id', workspaceId)
