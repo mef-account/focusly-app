@@ -27,10 +27,11 @@ export async function POST(req: NextRequest) {
     const adminClient = createAdminClient()
 
     // Invite the user via Supabase Auth (sends magic-link email)
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://focusly-app.vercel.app'
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://focusly-app-ten.vercel.app'
+    const confirmUrl = `${siteUrl}/auth/confirm?next=${encodeURIComponent('/app/dashboard')}`
     const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
       email,
-      { redirectTo: `${siteUrl}/app/settings?tab=team` }
+      { redirectTo: confirmUrl }
     )
     if (inviteError) {
       return NextResponse.json({ error: inviteError.message }, { status: 400 })
