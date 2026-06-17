@@ -25,8 +25,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Workspace not found or access denied' }, { status: 403 })
     }
 
-    const adminClient = createAdminClient()
-
     // Invite the user via Supabase Auth (sends magic-link email)
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://focusly-app-ten.vercel.app'
     const confirmUrl = `${siteUrl}/auth/confirm?next=${encodeURIComponent('/app/dashboard')}`
