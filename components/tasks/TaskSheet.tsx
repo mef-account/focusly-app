@@ -456,6 +456,17 @@ export function TaskSheet() {
     navigator.clipboard.writeText(address).then(() => toast.success('Email address copied'))
   }
 
+  function getEmailAttachmentNames(commentBody: string): string[] {
+    const attachmentLine = commentBody
+      .split('\n')
+      .find((line) => line.toLowerCase().startsWith('attachments:'))
+
+    if (!attachmentLine) return []
+    const namesRaw = attachmentLine.slice('attachments:'.length).trim()
+    if (!namesRaw) return []
+    return namesRaw.split(',').map((name) => name.trim()).filter(Boolean)
+  }
+
   // ── Derived structure data ─────────────────────────────────────────────────
 
   const currentProject = task?.project_id ? allProjects.find((p) => p.id === task.project_id) ?? (task.project as any) : null
@@ -715,6 +726,10 @@ export function TaskSheet() {
                     const isEmail = c.source === 'email'
                     const displayName = (c.author as any)?.name ?? c.sender_email ?? 'Unknown'
                     const initial = displayName[0]?.toUpperCase() ?? '?'
+                    const attachmentNames = isEmail ? getEmailAttachmentNames(c.body ?? '') : []
+                    const matchedAttachments = attachmentNames
+                      .map((name) => attachments.find((att) => att.file_name === name))
+                      .filter((att): att is (typeof attachments)[number] => Boolean(att))
                     return (
                       <div key={c.id} className="flex gap-3">
                         <div className={cn(
@@ -738,6 +753,22 @@ export function TaskSheet() {
                             isEmail ? 'bg-blue-500/5 border-blue-500/20' : 'bg-muted/40'
                           )}>
                             {c.body}
+                            {matchedAttachments.length > 0 && (
+                              <div className="mt-3 space-y-1 border-t border-border/50 pt-2">
+                                {matchedAttachments.map((att) => (
+                                  <button
+                                    key={`${c.id}-${att.id}`}
+                                    type="button"
+                                    onClick={() => handleDownload(att.storage_path, att.file_name)}
+                                    className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                                  >
+                                    <Paperclip className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="flex-1 truncate">{att.file_name}</span>
+                                    <Download className="h-3.5 w-3.5 shrink-0" />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
