@@ -251,6 +251,7 @@ export function TaskSheet() {
   const uploadAttachment = useUploadAttachment()
   const deleteAttachment = useDeleteAttachment()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const emailFileInputRef = useRef<HTMLInputElement>(null)
   const [uploadingFiles, setUploadingFiles] = useState<string[]>([])
 
   const [subtasks, setSubtasks] = useState<Task[]>([])
@@ -267,6 +268,7 @@ export function TaskSheet() {
   const [emailCc, setEmailCc] = useState('')
   const [emailSubject, setEmailSubject] = useState('')
   const [emailBody, setEmailBody] = useState('')
+  const [emailFiles, setEmailFiles] = useState<File[]>([])
   const [sendingEmail, setSendingEmail] = useState(false)
 
   // Structure cascade filter state
@@ -312,6 +314,8 @@ export function TaskSheet() {
       .eq('task_id', activeTaskId)
       .order('created_at', { ascending: true })
       .then(({ data }) => setComments((data as Comment[]) ?? []))
+
+    setEmailFiles([])
   }, [activeTaskId])
 
   function patch(updates: Partial<Task>) {
@@ -343,6 +347,17 @@ export function TaskSheet() {
         setUploadingFiles((prev) => prev.filter((n) => n !== file.name))
       }
     }
+  }
+
+  function handleEmailFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (isViewer || !e.target.files?.length) return
+    const selected = Array.from(e.target.files)
+    e.target.value = ''
+    setEmailFiles((prev) => [...prev, ...selected])
+  }
+
+  function removeEmailFile(index: number) {
+    setEmailFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
   async function handleDownload(storagePath: string, fileName: string) {
@@ -392,16 +407,17 @@ export function TaskSheet() {
     try {
       const toList = emailTo.split(',').map((e) => e.trim()).filter(Boolean)
       const ccList = emailCc.split(',').map((e) => e.trim()).filter(Boolean)
+      const formData = new FormData()
+      formData.append('taskId', task.id)
+      formData.append('to', JSON.stringify(toList))
+      if (ccList.length) formData.append('cc', JSON.stringify(ccList))
+      formData.append('subject', emailSubject || task.title)
+      formData.append('body', emailBody)
+      emailFiles.forEach((file) => formData.append('attachments', file))
+
       const res = await fetch('/api/email/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          taskId: task.id,
-          to: toList,
-          cc: ccList.length ? ccList : undefined,
-          subject: emailSubject || task.title,
-          body: emailBody,
-        }),
+        body: formData,
       })
       if (!res.ok) throw new Error('Send failed')
       toast.success('Email sent')
@@ -416,6 +432,7 @@ export function TaskSheet() {
       setEmailCc('')
       setEmailSubject('')
       setEmailBody('')
+      setEmailFiles([])
       setComposeMode('comment')
     } catch {
       toast.error('Could not send email')
@@ -800,10 +817,50 @@ export function TaskSheet() {
                         value={emailBody}
                         onChange={(e) => setEmailBody(e.target.value)}
                       />
+                      <input
+                        ref={emailFileInputRef}
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={handleEmailFileChange}
+                      />
+                      {emailFiles.length > 0 && (
+                        <div className="space-y-1 rounded-lg border border-border/60 bg-background/50 p-2">
+                          {emailFiles.map((file, index) => (
+                            <div key={`${file.name}-${index}`} className="flex items-center gap-2 text-xs">
+                              <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                              <span className="flex-1 truncate">{file.name}</span>
+                              <span className="shrink-0 text-muted-foreground">
+                                {file.size < 1024 * 1024
+                                  ? `${Math.round(file.size / 1024)} KB`
+                                  : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
+                              </span>
+                              <button
+                                type="button"
+                                title="Remove attachment"
+                                onClick={() => removeEmailFile(index)}
+                                className="text-muted-foreground hover:text-destructive"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <div className="flex items-center justify-between pt-1">
-                        <span className="text-[11px] text-muted-foreground/60 font-mono">
-                          from: {getTaskEmailAddress(task)}
-                        </span>
+                        <div className="flex min-w-0 items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => emailFileInputRef.current?.click()}
+                            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+                          >
+                            <Paperclip className="h-3 w-3" />
+                            Attach files
+                          </button>
+                          <span className="truncate text-[11px] text-muted-foreground/60 font-mono">
+                            from: {getTaskEmailAddress(task)}
+                          </span>
+                        </div>
                         <Button
                           size="sm"
                           className="h-7 gap-1.5 text-xs"

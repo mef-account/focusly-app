@@ -6,6 +6,21 @@ import { createAdminClient } from '@/lib/supabase/admin'
 // Must be disabled so we can read raw body for signature verification
 export const runtime = 'nodejs'
 
+const ATTACHMENTS_BUCKET = 'attachments'
+
+type InboundAttachment = {
+  id: string
+  filename?: string | null
+  size?: number
+  content_type?: string
+  content_disposition?: string | null
+  content_id?: string | null
+}
+
+function safeFileName(name: string): string {
+  return name.replace(/[^\w.\- ]+/g, '_').replace(/\s+/g, ' ').trim() || 'attachment'
+}
+
 /** Strip quoted reply chain from email body text */
 function stripReplyChain(text: string): string {
   const lines = text.split('\n')
@@ -68,6 +83,7 @@ export async function POST(req: NextRequest) {
 
   // Use plain text body; fall back to HTML with tags stripped
   let emailText: string = data.text ?? ''
+  let inboundAttachments: InboundAttachment[] = Array.isArray(data.attachments) ? data.attachments : []
   if (!emailText && data.html) {
     emailText = (data.html as string)
       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
@@ -95,6 +111,9 @@ export async function POST(req: NextRequest) {
           .replace(/&nbsp;/g, ' ')
           .replace(/\s{2,}/g, ' ')
           .trim()
+      }
+      if (fullEmail?.attachments?.length) {
+        inboundAttachments = fullEmail.attachments
       }
     } catch (e) {
       console.error('[email/inbound] Failed to fetch email via Receiving API:', e)
@@ -160,8 +179,8 @@ export async function POST(req: NextRequest) {
   // 7. Clean the email body
   const cleanBody = stripReplyChain(emailText)
   console.log('[email/inbound] cleanBody length:', cleanBody.length, '| preview:', cleanBody.slice(0, 100))
-  if (!cleanBody) {
-    console.warn('[email/inbound] Empty body after stripping — skipping comment insert')
+  if (!cleanBody && inboundAttachments.length === 0) {
+    console.warn('[email/inbound] Empty body and no attachments after stripping — skipping comment insert')
     return NextResponse.json({ ok: true })
   }
 
@@ -180,7 +199,10 @@ export async function POST(req: NextRequest) {
   headerLines.push(`From: ${senderEmail}`)
   if (ccList.length) headerLines.push(`Cc: ${ccList.join(', ')}`)
   if (subject) headerLines.push(`Subject: ${subject}`)
-  const commentBody = `${headerLines.join('\n')}\n\n${cleanBody}`
+  if (inboundAttachments.length) {
+    headerLines.push(`Attachments: ${inboundAttachments.map((att) => att.filename ?? `attachment-${att.id}`).join(', ')}`)
+  }
+  const commentBody = `${headerLines.join('\n')}\n\n${cleanBody || '(No message body)'}`
 
   await admin.from('comments').insert({
     task_id: taskId,
@@ -189,6 +211,59 @@ export async function POST(req: NextRequest) {
     source: 'email',
     sender_email: profile ? null : senderEmail,
   })
+
+  if (data.email_id && inboundAttachments.length) {
+    const resend = new Resend(process.env.RESEND_API_KEY)
+
+    for (const attachment of inboundAttachments) {
+      try {
+        const { data: attachmentData, error } = await resend.emails.receiving.attachments.get({
+          emailId: data.email_id,
+          id: attachment.id,
+        })
+
+        if (error || !attachmentData?.download_url) {
+          console.error('[email/inbound] Failed to get attachment download URL:', error)
+          continue
+        }
+
+        const response = await fetch(attachmentData.download_url)
+        if (!response.ok) {
+          console.error('[email/inbound] Failed to download attachment:', attachment.id, response.status)
+          continue
+        }
+
+        const fileName = safeFileName(attachmentData.filename ?? attachment.filename ?? `attachment-${attachment.id}`)
+        const storagePath = `email/${taskId}/${crypto.randomUUID()}-${fileName}`
+        const bytes = Buffer.from(await response.arrayBuffer())
+        const contentType = attachmentData.content_type ?? attachment.content_type ?? 'application/octet-stream'
+
+        const { error: uploadError } = await admin.storage
+          .from(ATTACHMENTS_BUCKET)
+          .upload(storagePath, bytes, { contentType })
+
+        if (uploadError) {
+          console.error('[email/inbound] Failed to upload attachment:', uploadError)
+          continue
+        }
+
+        const { error: insertError } = await admin.from('task_attachments').insert({
+          task_id: taskId,
+          user_id: profile?.id ?? null,
+          file_name: fileName,
+          file_size: attachmentData.size ?? attachment.size ?? bytes.length,
+          mime_type: contentType,
+          storage_path: storagePath,
+        })
+
+        if (insertError) {
+          console.error('[email/inbound] Failed to insert attachment row:', insertError)
+        }
+      } catch (err) {
+        console.error('[email/inbound] Unexpected attachment handling error:', err)
+      }
+    }
+  }
 
   // Must return 200 quickly — Resend retries on failure
   return NextResponse.json({ ok: true })

@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Resend } from 'resend'
+import { Resend, type Attachment } from 'resend'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const DOMAIN = process.env.RESEND_RECEIVING_DOMAIN ?? 'task.codicocorp.com'
+
+function parseStringArray(value: FormDataEntryValue | null): string[] {
+  if (typeof value !== 'string' || !value.trim()) return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : []
+  } catch {
+    return value.split(',').map((item) => item.trim()).filter(Boolean)
+  }
+}
 
 /** Build email address: PER-1@task.codicocorp.com */
 function taskEmailAddress(
@@ -20,13 +30,15 @@ function taskEmailAddress(
 export async function POST(req: NextRequest) {
   try {
     const resend = new Resend(process.env.RESEND_API_KEY)
-    const { taskId, to, cc, subject, body } = await req.json() as {
-      taskId: string
-      to: string[]
-      cc?: string[]
-      subject: string
-      body: string
-    }
+    const formData = await req.formData()
+    const taskId = String(formData.get('taskId') ?? '')
+    const to = parseStringArray(formData.get('to'))
+    const cc = parseStringArray(formData.get('cc'))
+    const subject = String(formData.get('subject') ?? '')
+    const body = String(formData.get('body') ?? '')
+    const files = formData
+      .getAll('attachments')
+      .filter((entry): entry is File => entry instanceof File && entry.size > 0)
 
     if (!taskId || !to?.length || !body?.trim()) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -69,6 +81,14 @@ export async function POST(req: NextRequest) {
     const fromName = projectName ? `${workspaceName} - ${projectName}` : workspaceName
     const fromAddress = `${fromName} <${taskEmail}>`
 
+    const emailAttachments: Attachment[] = await Promise.all(
+      files.map(async (file) => ({
+        filename: file.name,
+        content: Buffer.from(await file.arrayBuffer()).toString('base64'),
+        contentType: file.type || undefined,
+      }))
+    )
+
     // Send via Resend
     const { error: sendErr } = await resend.emails.send({
       from: fromAddress,
@@ -77,6 +97,7 @@ export async function POST(req: NextRequest) {
       cc: cc?.length ? cc : undefined,
       subject: subject || task.title,
       text: body,
+      attachments: emailAttachments.length ? emailAttachments : undefined,
     })
 
     if (sendErr) {
@@ -88,6 +109,9 @@ export async function POST(req: NextRequest) {
     const headerLines = [`To: ${to.join(', ')}`]
     if (cc?.length) headerLines.push(`Cc: ${cc.join(', ')}`)
     headerLines.push(`Subject: ${subject || task.title}`)
+    if (files.length) {
+      headerLines.push(`Attachments: ${files.map((file) => file.name).join(', ')}`)
+    }
     const commentBody = `${headerLines.join('\n')}\n\n${body}`
     await admin
       .from('comments')
