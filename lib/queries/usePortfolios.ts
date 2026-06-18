@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { getAccessScope } from '@/lib/queries/access'
+import { getAccessScope, buildProjectFilter } from '@/lib/queries/access'
 import type { Portfolio } from '@/types'
 
 const supabase = createClient()
@@ -12,31 +12,28 @@ export function usePortfolios() {
       const scope = await getAccessScope()
       if (!scope.userId) return []
 
-      if (!scope.isViewer) {
-        // Admin: all portfolios in owned workspaces
-        if (scope.ownedWorkspaceIds.length === 0) return []
-        const { data, error } = await supabase
-          .from('portfolios')
-          .select('*, owner:profiles!owner_id(id,name,avatar_url)')
-          .in('workspace_id', scope.ownedWorkspaceIds)
-          .order('created_at', { ascending: false })
-        if (error) throw error
-        return data as Portfolio[]
-      }
+      // Get accessible projects first, then derive portfolios from them
+      const filter = buildProjectFilter(scope)
+      if (!filter) return []
 
-      // Viewer: only portfolios that contain their granted projects
-      if (scope.accessibleProjectIds.length === 0) return []
       const { data: projects } = await supabase
-        .from('projects').select('portfolio_id').in('id', scope.accessibleProjectIds)
+        .from('projects').select('portfolio_id').or(filter)
       const portfolioIds = [...new Set(
-        (projects ?? []).map((p: { portfolio_id: string | null }) => p.portfolio_id).filter(Boolean) as string[]
+        (projects ?? [])
+          .map((p: { portfolio_id: string | null }) => p.portfolio_id)
+          .filter(Boolean) as string[]
       )]
       if (portfolioIds.length === 0) return []
+
+      // Also include all portfolios in owned workspaces (even empty ones)
+      const portfolioFilter: string[] = [`id.in.(${portfolioIds.join(',')})`]
+      if (scope.ownedWorkspaceIds.length > 0)
+        portfolioFilter.push(`workspace_id.in.(${scope.ownedWorkspaceIds.join(',')})`)
 
       const { data, error } = await supabase
         .from('portfolios')
         .select('*, owner:profiles!owner_id(id,name,avatar_url)')
-        .in('id', portfolioIds)
+        .or(portfolioFilter.join(','))
         .order('created_at', { ascending: false })
       if (error) throw error
       return data as Portfolio[]

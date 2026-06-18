@@ -4,10 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { getAccessScope } from '@/lib/queries/access'
 
 /**
- * Returns the current user's role.
- * 'admin'  — normal account owner
- * 'viewer' — invited read-only member (has a workspace_members viewer row)
- * null     — still loading
+ * Returns 'admin' when the user owns workspaces, 'viewer' when they only
+ * have granted project access (invited user), null while loading.
  */
 export function useCurrentUserRole(): 'admin' | 'viewer' | null {
   const { data } = useQuery({
@@ -15,9 +13,12 @@ export function useCurrentUserRole(): 'admin' | 'viewer' | null {
     queryFn: async () => {
       const scope = await getAccessScope()
       if (!scope.userId) return null
-      return scope.isViewer ? ('viewer' as const) : ('admin' as const)
+      // Admin owns workspaces; viewer has granted projects but no owned workspaces with content
+      if (scope.ownedWorkspaceIds.length > 0) return 'admin' as const
+      if (scope.grantedProjectIds.length > 0) return 'viewer' as const
+      return 'admin' as const  // default: treat as admin (new account, no projects yet)
     },
-    staleTime: 60_000,
+    staleTime: 30_000,
   })
 
   return data ?? null

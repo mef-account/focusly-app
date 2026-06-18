@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { getAccessScope } from '@/lib/queries/access'
+import { getAccessScope, buildProjectFilter } from '@/lib/queries/access'
 import type { Project } from '@/types'
 
 const supabase = createClient()
@@ -12,26 +12,14 @@ export function useProjects() {
       const scope = await getAccessScope()
       if (!scope.userId) return []
 
-      let query
-      if (scope.isViewer) {
-        // Viewer: ONLY explicitly granted projects
-        if (scope.accessibleProjectIds.length === 0) return []
-        query = supabase
-          .from('projects')
-          .select('*, tasks(status, due_date)')
-          .in('id', scope.accessibleProjectIds)
-          .order('created_at', { ascending: false })
-      } else {
-        // Admin: all projects in their owned workspaces
-        if (scope.ownedWorkspaceIds.length === 0) return []
-        query = supabase
-          .from('projects')
-          .select('*, tasks(status, due_date)')
-          .in('workspace_id', scope.ownedWorkspaceIds)
-          .order('created_at', { ascending: false })
-      }
+      const filter = buildProjectFilter(scope)
+      if (!filter) return []
 
-      const { data, error } = await query
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*, tasks(status, due_date)')
+        .or(filter)
+        .order('created_at', { ascending: false })
       if (error) throw error
 
       return (data ?? []).map((p: any) => {

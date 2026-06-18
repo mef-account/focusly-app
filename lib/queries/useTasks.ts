@@ -25,21 +25,19 @@ export function useTasks(projectId?: string) {
         q = q.eq('project_id', projectId)
       } else {
         const scope = await getAccessScope()
+        if (!scope.userId) return []
 
-        let accessibleProjIds: string[]
-        if (scope.isViewer) {
-          // Viewer: only explicitly granted projects
-          accessibleProjIds = scope.accessibleProjectIds
-        } else {
-          // Admin: all projects in owned workspaces
-          if (scope.ownedWorkspaceIds.length === 0) return []
+        // Collect all project IDs this user can see
+        const projIds = new Set<string>(scope.grantedProjectIds)
+
+        if (scope.ownedWorkspaceIds.length > 0) {
           const { data: projData } = await supabase
             .from('projects').select('id').in('workspace_id', scope.ownedWorkspaceIds)
-          accessibleProjIds = (projData ?? []).map((p: { id: string }) => p.id)
+          for (const p of projData ?? []) projIds.add(p.id)
         }
 
-        if (accessibleProjIds.length === 0) return []
-        q = q.in('project_id', accessibleProjIds)
+        if (projIds.size === 0) return []
+        q = q.in('project_id', [...projIds])
       }
 
       const { data, error } = await q

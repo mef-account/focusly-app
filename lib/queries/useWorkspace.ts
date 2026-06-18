@@ -29,32 +29,31 @@ export function useWorkspaces() {
       const scope = await getAccessScope()
       if (!scope.userId) return []
 
-      if (!scope.isViewer) {
-        // Admin: workspaces they own
-        const { data, error } = await supabase
-          .from('workspaces')
-          .select('*')
-          .eq('owner_id', scope.userId)
-          .order('created_at', { ascending: true })
-        if (error) throw error
-        return (data ?? []) as Workspace[]
+      const wsFilter: string[] = []
+
+      // Owned workspaces
+      if (scope.ownedWorkspaceIds.length > 0)
+        wsFilter.push(`id.in.(${scope.ownedWorkspaceIds.join(',')})`)
+
+      // Workspaces containing granted projects
+      if (scope.grantedProjectIds.length > 0) {
+        const { data: projects } = await supabase
+          .from('projects')
+          .select('workspace_id')
+          .in('id', scope.grantedProjectIds)
+        const grantedWsIds = [...new Set(
+          (projects ?? []).map((p: { workspace_id: string }) => p.workspace_id).filter(Boolean)
+        )]
+        if (grantedWsIds.length > 0)
+          wsFilter.push(`id.in.(${grantedWsIds.join(',')})`)
       }
 
-      // Viewer: only workspaces that contain their granted projects
-      if (scope.accessibleProjectIds.length === 0) return []
-      const { data: projects } = await supabase
-        .from('projects')
-        .select('workspace_id')
-        .in('id', scope.accessibleProjectIds)
-      const wsIds = [...new Set(
-        (projects ?? []).map((p: { workspace_id: string }) => p.workspace_id).filter(Boolean)
-      )]
-      if (wsIds.length === 0) return []
+      if (wsFilter.length === 0) return []
 
       const { data, error } = await supabase
         .from('workspaces')
         .select('*')
-        .in('id', wsIds)
+        .or(wsFilter.join(','))
         .order('created_at', { ascending: true })
       if (error) throw error
       return (data ?? []) as Workspace[]
