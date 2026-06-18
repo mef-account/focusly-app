@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Users, UserPlus, X, Loader2, Shield, User, Check, ChevronDown, ChevronRight, FolderKanban } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Users, UserPlus, X, Loader2, Shield, User, Check, ChevronDown, ChevronRight, FolderKanban, LogOut } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -9,6 +10,7 @@ import { useProjects } from '@/lib/queries/useProjects'
 import { usePortfolios } from '@/lib/queries/usePortfolios'
 import { useWorkspaces } from '@/lib/queries/useWorkspace'
 import { useCurrentUserRole } from '@/lib/hooks/useCurrentUserRole'
+import { createClient } from '@/lib/supabase/client'
 import {
   useAllUsers,
   useInviteUser,
@@ -60,25 +62,59 @@ export default function SettingsPage() {
 // ─── Account Tab ──────────────────────────────────────────────────────────────
 
 function AccountTab() {
+  const router = useRouter()
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const [signOutError, setSignOutError] = useState<string | null>(null)
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    import('@/lib/supabase/client').then(({ createClient }) => {
-      createClient().auth.getUser().then(({ data }) => {
-        setUserEmail(data.user?.email ?? null)
-        setUserId(data.user?.id ?? null)
-      })
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      setUserEmail(data.user?.email ?? null)
+      setUserId(data.user?.id ?? null)
     })
   }, [])
 
+  async function handleSignOut() {
+    setIsSigningOut(true)
+    setSignOutError(null)
+
+    const supabase = createClient()
+    const { error } = await supabase.auth.signOut()
+
+    if (error) {
+      setSignOutError(error.message)
+      setIsSigningOut(false)
+      return
+    }
+
+    router.replace('/login')
+    router.refresh()
+  }
+
   return (
     <div className="space-y-4 rounded-lg border border-border p-4 text-sm">
-      <h3 className="font-semibold">Logged in as</h3>
-      <div className="space-y-1 text-muted-foreground">
-        <p>Email: <span className="text-foreground font-medium">{userEmail ?? '…'}</span></p>
-        <p className="text-xs font-mono break-all">ID: {userId ?? '…'}</p>
+      <div>
+        <h3 className="font-semibold">Logged in as</h3>
+        <div className="mt-2 space-y-1 text-muted-foreground">
+          <p>Email: <span className="text-foreground font-medium">{userEmail ?? '...'}</span></p>
+          <p className="text-xs font-mono break-all">ID: {userId ?? '...'}</p>
+        </div>
+      </div>
+
+      <div className="border-t border-border pt-4">
+        <Button
+          type="button"
+          variant="destructive"
+          size="sm"
+          onClick={handleSignOut}
+          disabled={isSigningOut}
+        >
+          {isSigningOut ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
+          Log out
+        </Button>
+        {signOutError && <p className="mt-2 text-xs text-destructive">{signOutError}</p>}
       </div>
     </div>
   )
