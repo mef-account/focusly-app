@@ -27,17 +27,28 @@ export function useTasks(projectId?: string) {
         const scope = await getAccessScope()
         if (!scope.userId) return []
 
-        // Collect all project IDs this user can see
-        const projIds = new Set<string>(scope.grantedProjectIds)
+        // Build OR filter across all accessible tasks:
+        // 1. Tasks in explicitly granted projects (viewer access)
+        // 2. Tasks in projects owned by the user
+        // 3. Tasks with no project but in an owned workspace (workspace-level tasks)
+        const orParts: string[] = []
+
+        if (scope.grantedProjectIds.length > 0) {
+          orParts.push(`project_id.in.(${scope.grantedProjectIds.join(',')})`)
+        }
 
         if (scope.ownedWorkspaceIds.length > 0) {
           const { data: projData } = await supabase
             .from('projects').select('id').in('workspace_id', scope.ownedWorkspaceIds)
-          for (const p of projData ?? []) projIds.add(p.id)
+          const ownedProjIds = (projData ?? []).map((p: { id: string }) => p.id)
+          if (ownedProjIds.length > 0)
+            orParts.push(`project_id.in.(${ownedProjIds.join(',')})`)
+          // Tasks with no project but directly in an owned workspace
+          orParts.push(`and(project_id.is.null,workspace_id.in.(${scope.ownedWorkspaceIds.join(',')}))`)
         }
 
-        if (projIds.size === 0) return []
-        q = q.in('project_id', [...projIds])
+        if (orParts.length === 0) return []
+        q = q.or(orParts.join(','))
       }
 
       const { data, error } = await q
@@ -52,9 +63,25 @@ export function useTasksDueToday() {
     queryKey: ['tasks', 'due-today'],
     queryFn: async () => {
       const today = format(new Date(), 'yyyy-MM-dd')
+      const scope = await getAccessScope()
+      if (!scope.userId) return []
+
+      const orParts: string[] = []
+      if (scope.grantedProjectIds.length > 0)
+        orParts.push(`project_id.in.(${scope.grantedProjectIds.join(',')})`)
+      if (scope.ownedWorkspaceIds.length > 0) {
+        const { data: projData } = await supabase
+          .from('projects').select('id').in('workspace_id', scope.ownedWorkspaceIds)
+        const ids = (projData ?? []).map((p: { id: string }) => p.id)
+        if (ids.length > 0) orParts.push(`project_id.in.(${ids.join(',')})`)
+        orParts.push(`and(project_id.is.null,workspace_id.in.(${scope.ownedWorkspaceIds.join(',')}))`)
+      }
+      if (orParts.length === 0) return []
+
       const { data, error } = await supabase
         .from('tasks')
         .select('*, project:projects(id,name,color), assignee:profiles!assignee_id(id,name,avatar_url)')
+        .or(orParts.join(','))
         .lte('due_date', today)
         .not('status', 'in', '("done","cancelled")')
         .order('due_date', { ascending: true })
