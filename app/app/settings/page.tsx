@@ -170,7 +170,6 @@ function UsersSection() {
   const { data: allProjects = [] } = useProjects()
   const { data: portfolios = [] } = usePortfolios()
   const { data: workspaces = [] } = useWorkspaces()
-  const remove = useRemoveFromProject()
 
   return (
     <div>
@@ -190,8 +189,6 @@ function UsersSection() {
               allProjects={allProjects}
               portfolios={portfolios}
               workspaces={workspaces}
-              onRemoveProject={(projectId) => remove.mutate({ userId: u.user_id, projectId })}
-              onRemoveAll={() => remove.mutate({ userId: u.user_id })}
             />
           ))}
         </div>
@@ -207,23 +204,17 @@ function UserRow({
   allProjects,
   portfolios,
   workspaces,
-  onRemoveProject,
-  onRemoveAll,
 }: {
   user: TeamUser
   allProjects: Project[]
   portfolios: { id: string; name: string; workspace_id: string }[]
   workspaces: { id: string; name: string }[]
-  onRemoveProject: (projectId: string) => void
-  onRemoveAll: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const displayName = user.profiles?.name ?? user.email ?? user.user_id
   const initials = user.profiles?.name
     ? user.profiles.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : (user.email ?? 'U').slice(0, 2).toUpperCase()
-
-  const grantedProjects = allProjects.filter((p) => user.project_ids.includes(p.id))
 
   return (
     <div>
@@ -246,44 +237,12 @@ function UserRow({
           {user.project_ids.length} project{user.project_ids.length !== 1 ? 's' : ''}
           {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         </button>
-        <button
-          onClick={onRemoveAll}
-          title="Remove user from all projects"
-          className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
       </div>
 
-      {/* Expanded: current projects + add more */}
+      {/* Expanded: unified project checklist */}
       {expanded && (
-        <div className="border-t border-border bg-muted/20 px-4 py-3 space-y-3">
-          {/* Current project access */}
-          <div>
-            <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Current access</p>
-            {grantedProjects.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No projects assigned yet.</p>
-            ) : (
-              <div className="space-y-1">
-                {grantedProjects.map((p) => (
-                  <div key={p.id} className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: p.color ?? '#534AB7' }} />
-                    <span className="flex-1 text-sm truncate">{p.name}</span>
-                    <button
-                      onClick={() => onRemoveProject(p.id)}
-                      title="Remove access"
-                      className="text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Add projects */}
-          <AddProjectsPanel
+        <div className="border-t border-border bg-muted/20 px-4 py-3">
+          <ProjectAccessTree
             userId={user.user_id}
             currentProjectIds={user.project_ids}
             allProjects={allProjects}
@@ -296,9 +255,11 @@ function UserRow({
   )
 }
 
-// ─── Add Projects Panel ───────────────────────────────────────────────────────
+// ─── Project Access Tree ──────────────────────────────────────────────────────
+// Unified checklist: checked = has access, unchecked = no access.
+// Tracks local changes; saves diff on "Save" click.
 
-function AddProjectsPanel({
+function ProjectAccessTree({
   userId,
   currentProjectIds,
   allProjects,
@@ -312,14 +273,26 @@ function AddProjectsPanel({
   workspaces: { id: string; name: string }[]
 }) {
   const grantProjects = useGrantProjects()
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const removeFromProject = useRemoveFromProject()
+
+  // Local selection mirrors current access; user can toggle freely before saving
+  const [selected, setSelected] = useState<Set<string>>(new Set(currentProjectIds))
+  const [expandedWs, setExpandedWs] = useState<Set<string>>(new Set(workspaces.map((w) => w.id)))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Only projects not yet granted
-  const available = allProjects.filter((p) => !currentProjectIds.includes(p.id))
+  // Keep local state in sync when server data refreshes
+  const currentKey = currentProjectIds.slice().sort().join(',')
+  const [lastKey, setLastKey] = useState(currentKey)
+  if (currentKey !== lastKey) {
+    setSelected(new Set(currentProjectIds))
+    setLastKey(currentKey)
+  }
 
-  if (available.length === 0) return null
+  const originalIds = new Set(currentProjectIds)
+  const toAdd = Array.from(selected).filter((id) => !originalIds.has(id))
+  const toRemove = Array.from(originalIds).filter((id) => !selected.has(id))
+  const hasChanges = toAdd.length > 0 || toRemove.length > 0
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -329,13 +302,33 @@ function AddProjectsPanel({
     })
   }
 
-  async function handleAdd() {
-    if (selected.size === 0) return
+  function toggleGroup(ids: string[]) {
+    const allChecked = ids.length > 0 && ids.every((id) => selected.has(id))
+    setSelected((prev) => {
+      const next = new Set(prev)
+      for (const id of ids) allChecked ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function groupState(ids: string[]): 'all' | 'some' | 'none' {
+    if (ids.length === 0) return 'none'
+    const checked = ids.filter((id) => selected.has(id))
+    if (checked.length === ids.length) return 'all'
+    if (checked.length > 0) return 'some'
+    return 'none'
+  }
+
+  async function handleSave() {
     setSaving(true)
     setError(null)
     try {
-      await grantProjects.mutateAsync({ userId, projectIds: Array.from(selected) })
-      setSelected(new Set())
+      if (toAdd.length > 0) {
+        await grantProjects.mutateAsync({ userId, projectIds: toAdd })
+      }
+      for (const pid of toRemove) {
+        await removeFromProject.mutateAsync({ userId, projectId: pid })
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save')
     } finally {
@@ -344,46 +337,88 @@ function AddProjectsPanel({
   }
 
   return (
-    <div>
-      <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Add projects</p>
-      <div className="space-y-1 max-h-52 overflow-y-auto">
+    <div className="space-y-2">
+      <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
         {workspaces.map((ws) => {
-          const wsProjects = available.filter((p) => p.workspace_id === ws.id)
+          const wsProjects = allProjects.filter((p) => p.workspace_id === ws.id)
           if (wsProjects.length === 0) return null
           const wsPortfolios = portfolios.filter((pf) => pf.workspace_id === ws.id)
           const unassigned = wsProjects.filter((p) => !p.portfolio_id)
+          const wsOpen = expandedWs.has(ws.id)
+          const wsState = groupState(wsProjects.map((p) => p.id))
 
           return (
-            <div key={ws.id} className="space-y-0.5">
-              <p className="text-xs text-muted-foreground font-semibold pt-1">{ws.name}</p>
-              {wsPortfolios.map((pf) => {
-                const pfProjects = wsProjects.filter((p) => p.portfolio_id === pf.id)
-                if (pfProjects.length === 0) return null
-                return (
-                  <div key={pf.id} className="space-y-0.5">
-                    <div className="flex items-center gap-1 pl-2">
-                      <FolderKanban className="h-3 w-3 text-muted-foreground shrink-0" />
-                      <span className="text-xs text-muted-foreground">{pf.name}</span>
-                    </div>
-                    {pfProjects.map((p) => (
-                      <ProjectToggle key={p.id} project={p} checked={selected.has(p.id)} onToggle={() => toggle(p.id)} />
-                    ))}
-                  </div>
-                )
-              })}
-              {unassigned.map((p) => (
-                <ProjectToggle key={p.id} project={p} checked={selected.has(p.id)} onToggle={() => toggle(p.id)} />
-              ))}
+            <div key={ws.id} className="rounded-lg border border-border">
+              {/* Workspace header */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/40 rounded-t-lg">
+                <CheckBox state={wsState} onClick={() => toggleGroup(wsProjects.map((p) => p.id))} />
+                <span
+                  className="flex-1 text-sm font-semibold cursor-pointer"
+                  onClick={() => setExpandedWs((prev) => {
+                    const next = new Set(prev)
+                    next.has(ws.id) ? next.delete(ws.id) : next.add(ws.id)
+                    return next
+                  })}
+                >
+                  {ws.name}
+                </span>
+                <span className="text-xs text-muted-foreground">{wsProjects.length}</span>
+                <button
+                  type="button"
+                  onClick={() => setExpandedWs((prev) => {
+                    const next = new Set(prev)
+                    next.has(ws.id) ? next.delete(ws.id) : next.add(ws.id)
+                    return next
+                  })}
+                  className="text-muted-foreground"
+                >
+                  {wsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+
+              {wsOpen && (
+                <div className="p-2 space-y-1">
+                  {wsPortfolios.map((pf) => {
+                    const pfProjects = wsProjects.filter((p) => p.portfolio_id === pf.id)
+                    if (pfProjects.length === 0) return null
+                    const pfState = groupState(pfProjects.map((p) => p.id))
+                    return (
+                      <div key={pf.id} className="rounded border border-border">
+                        <div className="flex items-center gap-2 px-3 py-1.5">
+                          <CheckBox state={pfState} onClick={() => toggleGroup(pfProjects.map((p) => p.id))} />
+                          <FolderKanban className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <span className="flex-1 text-sm font-medium">{pf.name}</span>
+                        </div>
+                        <div className="border-t border-border">
+                          {pfProjects.map((p) => (
+                            <ProjectToggle key={p.id} project={p} checked={selected.has(p.id)} onToggle={() => toggle(p.id)} />
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {unassigned.map((p) => (
+                    <ProjectToggle key={p.id} project={p} checked={selected.has(p.id)} onToggle={() => toggle(p.id)} />
+                  ))}
+                </div>
+              )}
             </div>
           )
         })}
       </div>
-      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
-      {selected.size > 0 && (
-        <Button size="sm" className="mt-2" onClick={handleAdd} disabled={saving}>
-          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : `Add ${selected.size} project${selected.size !== 1 ? 's' : ''}`}
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      <div className="flex items-center justify-between pt-1">
+        <p className="text-xs text-muted-foreground">
+          {hasChanges
+            ? `${toAdd.length > 0 ? `+${toAdd.length} add` : ''}${toAdd.length > 0 && toRemove.length > 0 ? ', ' : ''}${toRemove.length > 0 ? `−${toRemove.length} remove` : ''}`
+            : 'Check or uncheck projects to change access.'}
+        </p>
+        <Button size="sm" onClick={handleSave} disabled={!hasChanges || saving}>
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}
         </Button>
-      )}
+      </div>
     </div>
   )
 }
