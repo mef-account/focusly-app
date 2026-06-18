@@ -17,8 +17,7 @@ async function requireAdmin() {
   return { user, adminClient }
 }
 
-// ─── GET — list project_members for a project ──────────────────────────────
-// Query param: ?projectId=<uuid>
+// ─── GET — list all project_members (flat); optionally filter by projectId ────
 export async function GET(req: NextRequest) {
   try {
     const ctx = await requireAdmin()
@@ -29,7 +28,7 @@ export async function GET(req: NextRequest) {
 
     let query = adminClient
       .from('project_members')
-      .select('project_id, user_id, role, created_at, profiles!project_members_user_id_fkey(id, name, avatar_url, email:id)')
+      .select('project_id, user_id, role, created_at, profiles!project_members_user_id_fkey(id, name, avatar_url)')
       .order('created_at', { ascending: true })
 
     if (projectId) {
@@ -39,14 +38,11 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    // Enrich with auth email (profiles table doesn't store email)
-    const userIds = (data ?? []).map((m: any) => m.user_id)
-    let emailMap: Record<string, string> = {}
-    if (userIds.length > 0) {
-      const { data: users } = await adminClient.auth.admin.listUsers()
-      for (const u of users?.users ?? []) {
-        if (u.email) emailMap[u.id] = u.email
-      }
+    // Enrich with auth email
+    const { data: users } = await adminClient.auth.admin.listUsers()
+    const emailMap: Record<string, string> = {}
+    for (const u of users?.users ?? []) {
+      if (u.email) emailMap[u.id] = u.email
     }
 
     const result = (data ?? []).map((m: any) => ({
@@ -64,26 +60,18 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ─── POST — invite user and/or add to project ──────────────────────────────
-// Body: { email: string, projectId: string }
+// ─── POST — invite user by email and add to one or more projects ──────────────
+// Body: { email: string, projectIds: string[] }
 export async function POST(req: NextRequest) {
   try {
-    const { email, projectId } = await req.json()
-    if (!email || !projectId) {
-      return NextResponse.json({ error: 'email and projectId are required' }, { status: 400 })
+    const { email, projectIds } = await req.json()
+    if (!email || !Array.isArray(projectIds) || projectIds.length === 0) {
+      return NextResponse.json({ error: 'email and at least one projectId are required' }, { status: 400 })
     }
 
     const ctx = await requireAdmin()
     if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { adminClient } = ctx
-
-    // Verify the project exists
-    const { data: project } = await adminClient
-      .from('projects')
-      .select('id')
-      .eq('id', projectId)
-      .single()
-    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
 
     // Find or invite the user
     let userId: string
@@ -103,41 +91,46 @@ export async function POST(req: NextRequest) {
       userId = invited.user.id
     }
 
-    // Ensure a profiles row exists (auto-created by Supabase trigger, but ensure type = 'viewer')
+    // Ensure profile row exists with type = 'user'
     await adminClient
       .from('profiles')
-      .upsert({ id: userId, type: 'viewer' }, { onConflict: 'id', ignoreDuplicates: true })
+      .upsert({ id: userId, type: 'user' }, { onConflict: 'id', ignoreDuplicates: true })
 
-    // Add to project_members
+    // Bulk upsert into project_members for all selected projects
+    const rows = projectIds.map((pid: string) => ({
+      project_id: pid,
+      user_id: userId,
+      role: 'viewer',
+    }))
     const { error: memberError } = await adminClient
       .from('project_members')
-      .upsert({ project_id: projectId, user_id: userId, role: 'viewer' }, { onConflict: 'project_id,user_id' })
+      .upsert(rows, { onConflict: 'project_id,user_id' })
     if (memberError) return NextResponse.json({ error: memberError.message }, { status: 500 })
 
-    return NextResponse.json({ success: true, userId })
+    return NextResponse.json({ success: true, userId, projectCount: projectIds.length })
   } catch (err: unknown) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Internal server error' }, { status: 500 })
   }
 }
 
-// ─── DELETE — remove a viewer from a project ──────────────────────────────
-// Body: { projectId: string, userId: string }
+// ─── DELETE — remove a viewer from a specific project or all projects ─────────
+// Body: { userId: string, projectId?: string }  (omit projectId to remove all)
 export async function DELETE(req: NextRequest) {
   try {
     const { projectId, userId } = await req.json()
-    if (!projectId || !userId) {
-      return NextResponse.json({ error: 'projectId and userId are required' }, { status: 400 })
+    if (!userId) {
+      return NextResponse.json({ error: 'userId is required' }, { status: 400 })
     }
 
     const ctx = await requireAdmin()
     if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { adminClient } = ctx
 
-    const { error } = await adminClient
-      .from('project_members')
-      .delete()
-      .eq('project_id', projectId)
-      .eq('user_id', userId)
+    let query = adminClient.from('project_members').delete().eq('user_id', userId)
+    if (projectId) {
+      query = query.eq('project_id', projectId)
+    }
+    const { error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     return NextResponse.json({ success: true })

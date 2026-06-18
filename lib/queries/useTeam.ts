@@ -10,58 +10,65 @@ export interface ProjectMember {
   profiles: Pick<Profile, 'id' | 'name' | 'avatar_url'> | null
 }
 
-/** List all members of a project. */
-export function useProjectMembers(projectId: string) {
+/** All unique viewers grouped by user, each with their list of project_ids. */
+export interface ViewerSummary {
+  user_id: string
+  email: string | null
+  profiles: Pick<Profile, 'id' | 'name' | 'avatar_url'> | null
+  project_ids: string[]
+}
+
+/** Flat list of all project_members across all projects. */
+export function useAllMembers() {
   return useQuery({
-    queryKey: ['project-members', projectId],
+    queryKey: ['project-members'],
     queryFn: async () => {
-      const res = await fetch(`/api/team/members?projectId=${projectId}`)
+      const res = await fetch('/api/team/members')
       if (!res.ok) throw new Error(await res.text())
       return res.json() as Promise<ProjectMember[]>
     },
-    enabled: !!projectId,
   })
 }
 
-/** Invite a user by email and add them to a project. */
-export function useInviteToProject() {
+/** Invite a user by email and add them to multiple projects at once. */
+export function useInviteToProjects() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ email, projectId }: { email: string; projectId: string }) => {
+    mutationFn: async ({ email, projectIds }: { email: string; projectIds: string[] }) => {
       const res = await fetch('/api/team/members', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, projectId }),
+        body: JSON.stringify({ email, projectIds }),
       })
       if (!res.ok) {
-        const { error } = await res.json()
-        throw new Error(error ?? 'Failed to invite')
+        const body = await res.json()
+        throw new Error(body.error ?? 'Failed to invite')
       }
       return res.json()
     },
-    onSuccess: (_data, { projectId }) => {
-      queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-members'] })
     },
   })
 }
 
-/** Remove a viewer from a project. */
+/** Remove a viewer from one project (pass projectId) or all projects (omit projectId). */
 export function useRemoveFromProject() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ projectId, userId }: { projectId: string; userId: string }) => {
+    mutationFn: async ({ userId, projectId }: { userId: string; projectId?: string }) => {
       const res = await fetch('/api/team/members', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, userId }),
+        body: JSON.stringify({ userId, projectId }),
       })
       if (!res.ok) {
-        const { error } = await res.json()
-        throw new Error(error ?? 'Failed to remove member')
+        const body = await res.json()
+        throw new Error(body.error ?? 'Failed to remove')
       }
     },
-    onSuccess: (_data, { projectId }) => {
-      queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-members'] })
     },
   })
 }
