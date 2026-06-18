@@ -27,13 +27,39 @@ export function useWorkspaces() {
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return []
-      // Return all workspaces the user owns OR is a member of (RLS handles filtering)
-      const { data, error } = await supabase
+
+      // Fetch workspaces the user owns
+      const { data: owned } = await supabase
         .from('workspaces')
         .select('*')
+        .eq('owner_id', user.id)
         .order('created_at', { ascending: true })
-      if (error) throw error
-      return data as Workspace[]
+
+      // Fetch workspaces the user is a member of (viewer)
+      const { data: memberships } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+
+      let memberWorkspaces: Workspace[] = []
+      if (memberships && memberships.length > 0) {
+        const ids = memberships.map((m: { workspace_id: string }) => m.workspace_id)
+        const { data: mws } = await supabase
+          .from('workspaces')
+          .select('*')
+          .in('id', ids)
+          .order('created_at', { ascending: true })
+        memberWorkspaces = (mws ?? []) as Workspace[]
+      }
+
+      // Combine and deduplicate
+      const all = [...(owned ?? []), ...memberWorkspaces]
+      const seen = new Set<string>()
+      return all.filter((w) => {
+        if (seen.has(w.id)) return false
+        seen.add(w.id)
+        return true
+      }) as Workspace[]
     },
   })
 }

@@ -8,9 +8,36 @@ export function useProjects() {
   return useQuery({
     queryKey: ['projects'],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return []
+
+      // Workspace IDs the user owns (admin)
+      const { data: owned } = await supabase
+        .from('workspaces').select('id').eq('owner_id', user.id)
+      const ownedWsIds = (owned ?? []).map((w: { id: string }) => w.id)
+
+      // Workspace IDs the user is a member of (viewer)
+      const { data: memberships } = await supabase
+        .from('workspace_members').select('workspace_id').eq('user_id', user.id)
+      const memberWsIds = (memberships ?? []).map((m: { workspace_id: string }) => m.workspace_id)
+
+      // Explicit project IDs the viewer has access to
+      const { data: access } = await supabase
+        .from('project_access').select('project_id').eq('user_id', user.id)
+      const accessProjIds = (access ?? []).map((a: { project_id: string }) => a.project_id)
+
+      const wsIds = [...new Set([...ownedWsIds, ...memberWsIds])]
+      if (wsIds.length === 0 && accessProjIds.length === 0) return []
+
+      // Build OR filter: projects in user's workspaces OR explicitly granted projects
+      const filters: string[] = []
+      if (wsIds.length > 0) filters.push(`workspace_id.in.(${wsIds.join(',')})`)
+      if (accessProjIds.length > 0) filters.push(`id.in.(${accessProjIds.join(',')})`)
+
       const { data, error } = await supabase
         .from('projects')
         .select('*, tasks(status, due_date)')
+        .or(filters.join(','))
         .order('created_at', { ascending: false })
       if (error) throw error
 

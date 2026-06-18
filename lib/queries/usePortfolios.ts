@@ -8,9 +8,26 @@ export function usePortfolios() {
   return useQuery({
     queryKey: ['portfolios'],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return []
+
+      // Get workspace IDs the user owns (admin)
+      const { data: owned } = await supabase
+        .from('workspaces').select('id').eq('owner_id', user.id)
+      const ownedIds = (owned ?? []).map((w: { id: string }) => w.id)
+
+      // Get workspace IDs the user is a member of (viewer)
+      const { data: memberships } = await supabase
+        .from('workspace_members').select('workspace_id').eq('user_id', user.id)
+      const memberIds = (memberships ?? []).map((m: { workspace_id: string }) => m.workspace_id)
+
+      const wsIds = [...new Set([...ownedIds, ...memberIds])]
+      if (wsIds.length === 0) return []
+
       const { data, error } = await supabase
         .from('portfolios')
         .select('*, owner:profiles!owner_id(id,name,avatar_url)')
+        .in('workspace_id', wsIds)
         .order('created_at', { ascending: false })
       if (error) throw error
       return data as Portfolio[]

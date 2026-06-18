@@ -11,13 +11,50 @@ export function useTasks(projectId?: string) {
   return useQuery({
     queryKey: ['tasks', projectId ?? 'all'],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return []
+
       let q = supabase
         .from('tasks')
         .select('*, project:projects(id,name,color,workspace_id,portfolio_id), workspace:workspaces(id,name,identifier), assignee:profiles!assignee_id(id,name,avatar_url), labels(id,name,color)')
         .is('parent_task_id', null)
         .order('created_at', { ascending: false })
 
-      if (projectId) q = q.eq('project_id', projectId)
+      if (projectId) {
+        q = q.eq('project_id', projectId)
+      } else {
+        // Filter to user's accessible workspaces + explicit project access
+        const { data: owned } = await supabase
+          .from('workspaces').select('id').eq('owner_id', user.id)
+        const ownedWsIds = (owned ?? []).map((w: { id: string }) => w.id)
+
+        const { data: memberships } = await supabase
+          .from('workspace_members').select('workspace_id').eq('user_id', user.id)
+        const memberWsIds = (memberships ?? []).map((m: { workspace_id: string }) => m.workspace_id)
+
+        const { data: access } = await supabase
+          .from('project_access').select('project_id').eq('user_id', user.id)
+        const accessProjIds = (access ?? []).map((a: { project_id: string }) => a.project_id)
+
+        const wsIds = [...new Set([...ownedWsIds, ...memberWsIds])]
+        const filters: string[] = []
+        if (wsIds.length > 0) filters.push(`project_id.in.(select:id:projects?workspace_id=in.(${wsIds.join(',')}))`)
+        if (accessProjIds.length > 0) filters.push(`project_id.in.(${accessProjIds.join(',')})`)
+
+        if (filters.length === 0) return []
+
+        // Simpler: filter by workspace via join on project
+        // Since tasks have project_id, we filter projects first then get task project_ids
+        const projFilters: string[] = []
+        if (wsIds.length > 0) projFilters.push(`workspace_id.in.(${wsIds.join(',')})`)
+        if (accessProjIds.length > 0) projFilters.push(`id.in.(${accessProjIds.join(',')})`)
+
+        const { data: accessibleProjects } = await supabase
+          .from('projects').select('id').or(projFilters.join(','))
+        const accessibleProjIds = (accessibleProjects ?? []).map((p: { id: string }) => p.id)
+        if (accessibleProjIds.length === 0) return []
+        q = q.in('project_id', accessibleProjIds)
+      }
 
       const { data, error } = await q
       if (error) throw toError(error)
