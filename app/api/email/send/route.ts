@@ -129,6 +129,7 @@ export async function POST(req: NextRequest) {
       })
 
     // Save outgoing attachments to Supabase Storage + task_attachments
+    const attachmentErrors: string[] = []
     for (const { file, bytes } of fileBuffers) {
       try {
         const safeFileName = file.name.replace(/[^\w.\- ]+/g, '_').trim() || 'attachment'
@@ -140,7 +141,9 @@ export async function POST(req: NextRequest) {
           .upload(storagePath, bytes, { contentType })
 
         if (uploadError) {
-          console.error('[email/send] Failed to upload attachment:', uploadError)
+          const msg = `Storage upload failed for ${file.name}: ${uploadError.message}`
+          console.error('[email/send]', msg)
+          attachmentErrors.push(msg)
           continue
         }
 
@@ -154,14 +157,18 @@ export async function POST(req: NextRequest) {
         })
 
         if (insertError) {
-          console.error('[email/send] Failed to insert attachment row:', insertError)
+          const msg = `DB insert failed for ${file.name}: ${insertError.message}`
+          console.error('[email/send]', msg)
+          attachmentErrors.push(msg)
         }
       } catch (err) {
-        console.error('[email/send] Unexpected attachment save error:', err)
+        const msg = `Unexpected error for ${file.name}: ${String(err)}`
+        console.error('[email/send]', msg)
+        attachmentErrors.push(msg)
       }
     }
 
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: true, attachmentErrors })
   } catch (err) {
     console.error('[email/send] Unexpected error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

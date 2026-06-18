@@ -422,7 +422,13 @@ export function TaskSheet() {
         body: formData,
       })
       if (!res.ok) throw new Error('Send failed')
-      toast.success('Email sent')
+      const resJson = await res.json()
+      if (resJson.attachmentErrors?.length) {
+        console.error('[sendEmail] Attachment save errors:', resJson.attachmentErrors)
+        toast.error(`Email sent but attachment save failed: ${resJson.attachmentErrors[0]}`)
+      } else {
+        toast.success('Email sent')
+      }
       // Refresh comments and attachments
       queryClient.invalidateQueries({ queryKey: ['attachments', 'by-task', task.id] })
       const { data } = await supabase
