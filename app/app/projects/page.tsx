@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Plus, FolderKanban, Building2, LayoutGrid,
@@ -33,6 +33,10 @@ import { cn } from '@/lib/utils'
 import type { Project, Portfolio, Workspace } from '@/types'
 
 const ROW_H = 'h-7'
+const LEFT_PANEL_MIN = 280
+const LEFT_PANEL_MAX = 620
+const LEFT_PANEL_DEFAULT = 288
+const LEFT_PANEL_STORAGE_KEY = 'focusly.structure.leftPanelWidth'
 
 type Row =
   | { kind: 'portfolio'; portfolio: Portfolio; projectCount: number }
@@ -240,8 +244,23 @@ export default function ProjectsPage() {
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
   const [collapsedPortfolios, setCollapsedPortfolios] = useState<Set<string>>(new Set())
   const [unassignedCollapsed, setUnassignedCollapsed] = useState(true)
+  const [leftPanelWidth, setLeftPanelWidth] = useState<number>(LEFT_PANEL_DEFAULT)
+  const [isResizing, setIsResizing] = useState(false)
+  const resizeRef = useRef<{ startX: number; startWidth: number }>({ startX: 0, startWidth: LEFT_PANEL_DEFAULT })
 
   const isLoading = loadingProjects || loadingWorkspaces || loadingPortfolios
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const saved = Number(window.localStorage.getItem(LEFT_PANEL_STORAGE_KEY))
+    if (!Number.isFinite(saved)) return
+    setLeftPanelWidth(Math.max(LEFT_PANEL_MIN, Math.min(LEFT_PANEL_MAX, saved)))
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(LEFT_PANEL_STORAGE_KEY, String(leftPanelWidth))
+  }, [leftPanelWidth])
 
   const activePortfolios = (selectedWorkspaceId
     ? portfolios.filter((p) => p.workspace_id === selectedWorkspaceId)
@@ -320,6 +339,46 @@ export default function ProjectsPage() {
     if (!open) setCreateForPortfolioId(null)
   }
 
+  const startResize = useCallback((clientX: number) => {
+    resizeRef.current = { startX: clientX, startWidth: leftPanelWidth }
+    setIsResizing(true)
+  }, [leftPanelWidth])
+
+  const moveResize = useCallback((clientX: number) => {
+    setLeftPanelWidth(() => {
+      const dx = clientX - resizeRef.current.startX
+      const next = resizeRef.current.startWidth + dx
+      return Math.max(LEFT_PANEL_MIN, Math.min(LEFT_PANEL_MAX, next))
+    })
+  }, [])
+
+  const stopResize = useCallback(() => {
+    setIsResizing(false)
+  }, [])
+
+  useEffect(() => {
+    if (!isResizing) return
+
+    const onMouseMove = (e: MouseEvent) => moveResize(e.clientX)
+    const onMouseUp = () => stopResize()
+    const onTouchMove = (e: TouchEvent) => {
+      if (!e.touches.length) return
+      moveResize(e.touches[0].clientX)
+    }
+    const onTouchEnd = () => stopResize()
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+    document.addEventListener('touchmove', onTouchMove, { passive: true })
+    document.addEventListener('touchend', onTouchEnd)
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+      document.removeEventListener('touchmove', onTouchMove)
+      document.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [isResizing, moveResize, stopResize])
+
   return (
     <div className="flex h-full flex-col gap-0">
       {/* Header — project count | workspace tabs | action buttons */}
@@ -374,7 +433,7 @@ export default function ProjectsPage() {
       </div>
 
       {/* Table + Gantt */}
-      <div className="flex flex-1 min-h-0 pt-2">
+      <div className={cn('flex flex-1 min-h-0 pt-2', isResizing && 'select-none cursor-col-resize')}>
         {isLoading ? (
           <div className="space-y-3 w-full">
             {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-9 rounded-lg" />)}
@@ -395,7 +454,7 @@ export default function ProjectsPage() {
         ) : (
           <>
             {/* Left: project names */}
-            <div className="w-72 shrink-0 border-r flex flex-col">
+            <div className="shrink-0 border-r flex flex-col" style={{ width: leftPanelWidth }}>
               <div className={cn(GANTT_TOOLBAR_H, 'border-b shrink-0')} />
               <div className={cn(ROW_H, 'flex items-center border-b px-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground shrink-0')}>
                 Project
@@ -441,6 +500,27 @@ export default function ProjectsPage() {
                 return null
               })}
             </div>
+
+            {/* Draggable divider */}
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize project names panel"
+              className={cn(
+                'w-1 shrink-0 border-r border-border/70 bg-border/30 transition-colors',
+                'hover:bg-border/80 cursor-col-resize',
+                isResizing && 'bg-border'
+              )}
+              onMouseDown={(e) => {
+                if (e.button !== 0) return
+                e.preventDefault()
+                startResize(e.clientX)
+              }}
+              onTouchStart={(e) => {
+                if (!e.touches.length) return
+                startResize(e.touches[0].clientX)
+              }}
+            />
 
             {/* Right: Gantt timeline */}
             <StructureGantt rows={rows} windowStart={windowStart} windowEnd={windowEnd} />
