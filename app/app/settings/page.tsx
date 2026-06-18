@@ -423,6 +423,26 @@ function ProjectAccessTree({
   )
 }
 
+// ─── CheckBox ─────────────────────────────────────────────────────────────────
+
+function CheckBox({ state, onClick }: { state: 'all' | 'some' | 'none'; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+        state === 'all'
+          ? 'border-primary bg-primary text-primary-foreground'
+          : state === 'some'
+          ? 'border-primary bg-primary/30'
+          : 'border-input bg-background'
+      }`}
+    >
+      {state !== 'none' && <Check className="h-3 w-3" />}
+    </button>
+  )
+}
+
 // ─── Project Toggle ───────────────────────────────────────────────────────────
 
 function ProjectToggle({ project, checked, onToggle }: { project: Project; checked: boolean; onToggle: () => void }) {
