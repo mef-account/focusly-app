@@ -23,6 +23,12 @@ type Tab = 'account' | 'team'
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>('account')
 
+  // Prefetch all Team tab data immediately so it's ready when the tab is clicked
+  useAllUsers()
+  useProjects()
+  usePortfolios()
+  useWorkspaces()
+
   return (
     <div className="mx-auto max-w-3xl px-6 py-8">
       <h2 className="text-xl font-semibold">Settings</h2>

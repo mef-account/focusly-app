@@ -17,6 +17,7 @@ export function useAllUsers() {
       if (!res.ok) throw new Error(await res.text())
       return res.json() as Promise<TeamUser[]>
     },
+    staleTime: 30_000,
   })
 }
 
