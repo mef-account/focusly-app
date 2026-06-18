@@ -1,19 +1,20 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Users, UserPlus, X, Loader2, Shield, User, Check, ChevronDown, ChevronRight, Building2, FolderKanban } from 'lucide-react'
+import { Users, UserPlus, X, Loader2, Shield, User, Check, ChevronDown, ChevronRight, FolderKanban } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useProjects } from '@/lib/queries/useProjects'
-import { useWorkspaces } from '@/lib/queries/useWorkspace'
 import { usePortfolios } from '@/lib/queries/usePortfolios'
+import { useWorkspaces } from '@/lib/queries/useWorkspace'
 import { useCurrentUserRole } from '@/lib/hooks/useCurrentUserRole'
 import {
-  useAllMembers,
-  useInviteToProjects,
+  useAllUsers,
+  useInviteUser,
+  useGrantProjects,
   useRemoveFromProject,
-  type ProjectMember,
+  type TeamUser,
 } from '@/lib/queries/useTeam'
 import type { Project } from '@/types'
 
@@ -101,228 +102,96 @@ function TeamTab() {
 
   return (
     <div className="space-y-8">
-      <InvitePanel />
-      <MemberList />
+      {/* Section 1: Invite */}
+      <InviteSection />
+      {/* Section 2: Existing users + project access */}
+      <UsersSection />
     </div>
   )
 }
 
-// ─── Invite Panel ─────────────────────────────────────────────────────────────
+// ─── Section 1: Invite ────────────────────────────────────────────────────────
 
-function InvitePanel() {
-  const { data: allProjects = [] } = useProjects()
-  const { data: workspaces = [] } = useWorkspaces()
-  const { data: portfolios = [] } = usePortfolios()
-  const invite = useInviteToProjects()
-
+function InviteSection() {
+  const inviteUser = useInviteUser()
   const [email, setEmail] = useState('')
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [expandedWs, setExpandedWs] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
-  // Auto-expand all workspaces
-  useEffect(() => {
-    if (workspaces.length > 0) {
-      setExpandedWs(new Set(workspaces.map((w) => w.id)))
-    }
-  }, [workspaces.length])
-
-  function toggleProject(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
-  function toggleGroup(ids: string[]) {
-    const allChecked = ids.length > 0 && ids.every((id) => selected.has(id))
-    setSelected((prev) => {
-      const next = new Set(prev)
-      for (const id of ids) {
-        allChecked ? next.delete(id) : next.add(id)
-      }
-      return next
-    })
-  }
-
-  function groupState(ids: string[]): 'all' | 'some' | 'none' {
-    if (ids.length === 0) return 'none'
-    const checked = ids.filter((id) => selected.has(id))
-    if (checked.length === ids.length) return 'all'
-    if (checked.length > 0) return 'some'
-    return 'none'
-  }
-
-  async function handleInvite(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (selected.size === 0) { setError('Select at least one project.'); return }
     setError(null)
-    setSuccess(false)
+    setSuccessMsg(null)
     try {
-      await invite.mutateAsync({ email: email.trim(), projectIds: Array.from(selected) })
+      const result = await inviteUser.mutateAsync(email.trim())
       setEmail('')
-      setSelected(new Set())
-      setSuccess(true)
-      setTimeout(() => setSuccess(false), 5000)
+      if (result.alreadyExists) {
+        setSuccessMsg(`${email.trim()} already has an account and has been added to the users list.`)
+      } else {
+        setSuccessMsg(`Invite sent to ${email.trim()}. They will receive a magic-link email.`)
+      }
+      setTimeout(() => setSuccessMsg(null), 6000)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to invite')
+      setError(err instanceof Error ? err.message : 'Failed to send invite')
     }
   }
 
   return (
-    <div className="rounded-lg border border-border p-4 space-y-4">
-      <h3 className="text-sm font-semibold flex items-center gap-2">
-        <UserPlus className="h-4 w-4" /> Invite a viewer
+    <div className="rounded-lg border border-border p-4">
+      <h3 className="mb-3 text-sm font-semibold flex items-center gap-2">
+        <UserPlus className="h-4 w-4" /> Invite a new user
       </h3>
-
-      <form onSubmit={handleInvite} className="space-y-4">
-        {/* Email */}
-        <div className="flex gap-2">
-          <input
-            type="email"
-            placeholder="colleague@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-        </div>
-
-        {/* Project checklist */}
-        <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-          {workspaces.map((ws) => {
-            const wsProjects = allProjects.filter((p) => p.workspace_id === ws.id)
-            if (wsProjects.length === 0) return null
-            const wsPortfolios = portfolios
-              .filter((p) => p.workspace_id === ws.id)
-              .sort((a, b) => a.name.localeCompare(b.name))
-            const unassigned = wsProjects.filter((p) => !p.portfolio_id)
-            const wsOpen = expandedWs.has(ws.id)
-            const wsState = groupState(wsProjects.map((p) => p.id))
-
-            return (
-              <div key={ws.id} className="rounded-lg border border-border">
-                {/* Workspace header */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-muted/40 rounded-t-lg">
-                  <CheckBox
-                    state={wsState}
-                    onClick={() => toggleGroup(wsProjects.map((p) => p.id))}
-                  />
-                  <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span
-                    className="flex-1 text-sm font-semibold cursor-pointer"
-                    onClick={() => setExpandedWs((prev) => {
-                      const next = new Set(prev)
-                      next.has(ws.id) ? next.delete(ws.id) : next.add(ws.id)
-                      return next
-                    })}
-                  >
-                    {ws.name}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{wsProjects.length}</span>
-                  <button
-                    type="button"
-                    onClick={() => setExpandedWs((prev) => {
-                      const next = new Set(prev)
-                      next.has(ws.id) ? next.delete(ws.id) : next.add(ws.id)
-                      return next
-                    })}
-                    className="text-muted-foreground"
-                  >
-                    {wsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                  </button>
-                </div>
-
-                {wsOpen && (
-                  <div className="p-2 space-y-1">
-                    {wsPortfolios.map((pf) => {
-                      const pfProjects = wsProjects.filter((p) => p.portfolio_id === pf.id)
-                      if (pfProjects.length === 0) return null
-                      const pfState = groupState(pfProjects.map((p) => p.id))
-                      return (
-                        <div key={pf.id} className="rounded border border-border">
-                          <div className="flex items-center gap-2 px-3 py-1.5">
-                            <CheckBox state={pfState} onClick={() => toggleGroup(pfProjects.map((p) => p.id))} />
-                            <FolderKanban className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                            <span className="flex-1 text-sm font-medium">{pf.name}</span>
-                          </div>
-                          <div className="border-t border-border">
-                            {pfProjects.map((p) => (
-                              <ProjectCheckRow key={p.id} project={p} checked={selected.has(p.id)} onToggle={() => toggleProject(p.id)} />
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {unassigned.map((p) => (
-                      <ProjectCheckRow key={p.id} project={p} checked={selected.has(p.id)} onToggle={() => toggleProject(p.id)} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-
-        <div className="flex items-center justify-between pt-1">
-          <p className="text-xs text-muted-foreground">
-            {selected.size === 0
-              ? 'Select the projects this person can view.'
-              : `${selected.size} project${selected.size !== 1 ? 's' : ''} selected`}
-          </p>
-          <Button type="submit" size="sm" disabled={invite.isPending || !email.trim() || selected.size === 0}>
-            {invite.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Send invite'}
-          </Button>
-        </div>
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <input
+          type="email"
+          placeholder="colleague@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+        <Button type="submit" size="sm" disabled={inviteUser.isPending || !email.trim()}>
+          {inviteUser.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Send invite'}
+        </Button>
       </form>
-
-      {error && <p className="text-xs text-destructive">{error}</p>}
-      {success && <p className="text-xs text-green-500">Invite sent! They will receive a magic-link email.</p>}
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+      {successMsg && <p className="mt-2 text-xs text-green-500">{successMsg}</p>}
+      <p className="mt-2 text-xs text-muted-foreground">
+        The person receives a magic-link email and becomes a <strong>viewer</strong> with no project access yet. Use the section below to assign projects.
+      </p>
     </div>
   )
 }
 
-// ─── Member List ──────────────────────────────────────────────────────────────
+// ─── Section 2: Users & Project Access ────────────────────────────────────────
 
-function MemberList() {
-  const { data: allMembers = [], isLoading } = useAllMembers()
+function UsersSection() {
+  const { data: users = [], isLoading } = useAllUsers()
   const { data: allProjects = [] } = useProjects()
-  const removeMutation = useRemoveFromProject()
-
-  // Group flat rows by user
-  const viewers = Object.values(
-    allMembers.reduce<Record<string, { user_id: string; email: string | null; profiles: ProjectMember['profiles']; project_ids: string[] }>>(
-      (acc, m) => {
-        if (!acc[m.user_id]) {
-          acc[m.user_id] = { user_id: m.user_id, email: m.email, profiles: m.profiles, project_ids: [] }
-        }
-        acc[m.user_id].project_ids.push(m.project_id)
-        return acc
-      },
-      {}
-    )
-  )
+  const { data: portfolios = [] } = usePortfolios()
+  const { data: workspaces = [] } = useWorkspaces()
+  const remove = useRemoveFromProject()
 
   return (
     <div>
-      <h3 className="mb-3 text-sm font-semibold">Members</h3>
+      <h3 className="mb-3 text-sm font-semibold">Users</h3>
       {isLoading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading…
         </div>
-      ) : viewers.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No viewers yet. Invite someone above.</p>
+      ) : users.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No users yet. Invite someone above.</p>
       ) : (
         <div className="divide-y divide-border rounded-lg border border-border">
-          {viewers.map((viewer) => (
-            <ViewerRow
-              key={viewer.user_id}
-              viewer={viewer}
+          {users.map((u) => (
+            <UserRow
+              key={u.user_id}
+              user={u}
               allProjects={allProjects}
-              onRemoveProject={(projectId) => removeMutation.mutate({ userId: viewer.user_id, projectId })}
-              onRemoveAll={() => removeMutation.mutate({ userId: viewer.user_id })}
+              portfolios={portfolios}
+              workspaces={workspaces}
+              onRemoveProject={(projectId) => remove.mutate({ userId: u.user_id, projectId })}
+              onRemoveAll={() => remove.mutate({ userId: u.user_id })}
             />
           ))}
         </div>
@@ -331,122 +200,208 @@ function MemberList() {
   )
 }
 
-// ─── Viewer Row ───────────────────────────────────────────────────────────────
+// ─── User Row ─────────────────────────────────────────────────────────────────
 
-function ViewerRow({
-  viewer,
+function UserRow({
+  user,
   allProjects,
+  portfolios,
+  workspaces,
   onRemoveProject,
   onRemoveAll,
 }: {
-  viewer: { user_id: string; email: string | null; profiles: ProjectMember['profiles']; project_ids: string[] }
+  user: TeamUser
   allProjects: Project[]
+  portfolios: { id: string; name: string; workspace_id: string }[]
+  workspaces: { id: string; name: string }[]
   onRemoveProject: (projectId: string) => void
   onRemoveAll: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const displayName = viewer.profiles?.name ?? viewer.email ?? viewer.user_id
-  const initials = viewer.profiles?.name
-    ? viewer.profiles.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
-    : (viewer.email ?? 'U').slice(0, 2).toUpperCase()
+  const displayName = user.profiles?.name ?? user.email ?? user.user_id
+  const initials = user.profiles?.name
+    ? user.profiles.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+    : (user.email ?? 'U').slice(0, 2).toUpperCase()
 
-  const grantedProjects = allProjects.filter((p) => viewer.project_ids.includes(p.id))
+  const grantedProjects = allProjects.filter((p) => user.project_ids.includes(p.id))
 
   return (
     <div>
+      {/* Row header */}
       <div className="flex items-center gap-3 px-4 py-3">
         <Avatar className="h-8 w-8 shrink-0">
           <AvatarFallback className="bg-muted text-muted-foreground text-xs">{initials}</AvatarFallback>
         </Avatar>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{displayName}</p>
-          {viewer.email && viewer.profiles?.name && (
-            <p className="truncate text-xs text-muted-foreground">{viewer.email}</p>
+          {user.email && user.profiles?.name && (
+            <p className="truncate text-xs text-muted-foreground">{user.email}</p>
           )}
         </div>
         <Badge variant="secondary" className="shrink-0 text-xs">viewer</Badge>
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="shrink-0 text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+          className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
-          {viewer.project_ids.length} project{viewer.project_ids.length !== 1 ? 's' : ''}
+          {user.project_ids.length} project{user.project_ids.length !== 1 ? 's' : ''}
           {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         </button>
         <button
           onClick={onRemoveAll}
+          title="Remove user from all projects"
           className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-          title="Remove from all projects"
         >
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
 
+      {/* Expanded: current projects + add more */}
       {expanded && (
-        <div className="border-t border-border bg-muted/20 px-4 py-2 space-y-1">
-          {grantedProjects.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No projects.</p>
-          ) : (
-            grantedProjects.map((p) => (
-              <div key={p.id} className="flex items-center gap-2 py-0.5">
-                <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: p.color ?? '#534AB7' }} />
-                <span className="flex-1 text-sm truncate">{p.name}</span>
-                <button
-                  onClick={() => onRemoveProject(p.id)}
-                  className="text-muted-foreground hover:text-destructive transition-colors"
-                  title="Remove access to this project"
-                >
-                  <X className="h-3 w-3" />
-                </button>
+        <div className="border-t border-border bg-muted/20 px-4 py-3 space-y-3">
+          {/* Current project access */}
+          <div>
+            <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Current access</p>
+            {grantedProjects.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No projects assigned yet.</p>
+            ) : (
+              <div className="space-y-1">
+                {grantedProjects.map((p) => (
+                  <div key={p.id} className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: p.color ?? '#534AB7' }} />
+                    <span className="flex-1 text-sm truncate">{p.name}</span>
+                    <button
+                      onClick={() => onRemoveProject(p.id)}
+                      title="Remove access"
+                      className="text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))
-          )}
+            )}
+          </div>
+
+          {/* Add projects */}
+          <AddProjectsPanel
+            userId={user.user_id}
+            currentProjectIds={user.project_ids}
+            allProjects={allProjects}
+            portfolios={portfolios}
+            workspaces={workspaces}
+          />
         </div>
       )}
     </div>
   )
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Add Projects Panel ───────────────────────────────────────────────────────
 
-function CheckBox({ state, onClick }: { state: 'all' | 'some' | 'none'; onClick: () => void }) {
+function AddProjectsPanel({
+  userId,
+  currentProjectIds,
+  allProjects,
+  portfolios,
+  workspaces,
+}: {
+  userId: string
+  currentProjectIds: string[]
+  allProjects: Project[]
+  portfolios: { id: string; name: string; workspace_id: string }[]
+  workspaces: { id: string; name: string }[]
+}) {
+  const grantProjects = useGrantProjects()
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Only projects not yet granted
+  const available = allProjects.filter((p) => !currentProjectIds.includes(p.id))
+
+  if (available.length === 0) return null
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  async function handleAdd() {
+    if (selected.size === 0) return
+    setSaving(true)
+    setError(null)
+    try {
+      await grantProjects.mutateAsync({ userId, projectIds: Array.from(selected) })
+      setSelected(new Set())
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-        state === 'all'
-          ? 'border-primary bg-primary text-primary-foreground'
-          : state === 'some'
-          ? 'border-primary bg-primary/30'
-          : 'border-input bg-background'
-      }`}
-    >
-      {state !== 'none' && <Check className="h-3 w-3" />}
-    </button>
+    <div>
+      <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Add projects</p>
+      <div className="space-y-1 max-h-52 overflow-y-auto">
+        {workspaces.map((ws) => {
+          const wsProjects = available.filter((p) => p.workspace_id === ws.id)
+          if (wsProjects.length === 0) return null
+          const wsPortfolios = portfolios.filter((pf) => pf.workspace_id === ws.id)
+          const unassigned = wsProjects.filter((p) => !p.portfolio_id)
+
+          return (
+            <div key={ws.id} className="space-y-0.5">
+              <p className="text-xs text-muted-foreground font-semibold pt-1">{ws.name}</p>
+              {wsPortfolios.map((pf) => {
+                const pfProjects = wsProjects.filter((p) => p.portfolio_id === pf.id)
+                if (pfProjects.length === 0) return null
+                return (
+                  <div key={pf.id} className="space-y-0.5">
+                    <div className="flex items-center gap-1 pl-2">
+                      <FolderKanban className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <span className="text-xs text-muted-foreground">{pf.name}</span>
+                    </div>
+                    {pfProjects.map((p) => (
+                      <ProjectToggle key={p.id} project={p} checked={selected.has(p.id)} onToggle={() => toggle(p.id)} />
+                    ))}
+                  </div>
+                )
+              })}
+              {unassigned.map((p) => (
+                <ProjectToggle key={p.id} project={p} checked={selected.has(p.id)} onToggle={() => toggle(p.id)} />
+              ))}
+            </div>
+          )
+        })}
+      </div>
+      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
+      {selected.size > 0 && (
+        <Button size="sm" className="mt-2" onClick={handleAdd} disabled={saving}>
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : `Add ${selected.size} project${selected.size !== 1 ? 's' : ''}`}
+        </Button>
+      )}
+    </div>
   )
 }
 
-function ProjectCheckRow({
-  project,
-  checked,
-  onToggle,
-}: {
-  project: Project
-  checked: boolean
-  onToggle: () => void
-}) {
+// ─── Project Toggle ───────────────────────────────────────────────────────────
+
+function ProjectToggle({ project, checked, onToggle }: { project: Project; checked: boolean; onToggle: () => void }) {
   return (
     <button
-      type="button"
       onClick={onToggle}
-      className="flex w-full items-center gap-2 px-3 py-1.5 pl-8 text-left hover:bg-accent/50 transition-colors"
+      className="flex w-full items-center gap-2 rounded px-2 py-1 pl-4 text-left hover:bg-accent/50 transition-colors"
     >
       <div
-        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+        className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors ${
           checked ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background'
         }`}
       >
-        {checked && <Check className="h-3 w-3" />}
+        {checked && <Check className="h-2.5 w-2.5" />}
       </div>
       <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: project.color ?? '#534AB7' }} />
       <span className="flex-1 truncate text-sm">{project.name}</span>

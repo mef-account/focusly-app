@@ -1,58 +1,65 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Profile } from '@/types'
 
-export interface ProjectMember {
-  project_id: string
-  user_id: string
-  role: 'viewer'
-  created_at: string
-  email: string | null
-  profiles: Pick<Profile, 'id' | 'name' | 'avatar_url'> | null
-}
-
-/** All unique viewers grouped by user, each with their list of project_ids. */
-export interface ViewerSummary {
+export interface TeamUser {
   user_id: string
   email: string | null
   profiles: Pick<Profile, 'id' | 'name' | 'avatar_url'> | null
   project_ids: string[]
 }
 
-/** Flat list of all project_members across all projects. */
-export function useAllMembers() {
+/** All user-type accounts with their current project access. */
+export function useAllUsers() {
   return useQuery({
-    queryKey: ['project-members'],
+    queryKey: ['team-users'],
     queryFn: async () => {
       const res = await fetch('/api/team/members')
       if (!res.ok) throw new Error(await res.text())
-      return res.json() as Promise<ProjectMember[]>
+      return res.json() as Promise<TeamUser[]>
     },
   })
 }
 
-/** Invite a user by email and add them to multiple projects at once. */
-export function useInviteToProjects() {
+/** Invite a new person by email only. No project assignment. */
+export function useInviteUser() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ email, projectIds }: { email: string; projectIds: string[] }) => {
+    mutationFn: async (email: string) => {
       const res = await fetch('/api/team/members', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, projectIds }),
+        body: JSON.stringify({ email }),
       })
       if (!res.ok) {
         const body = await res.json()
         throw new Error(body.error ?? 'Failed to invite')
       }
-      return res.json()
+      return res.json() as Promise<{ success: boolean; userId: string; alreadyExists: boolean }>
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['project-members'] })
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['team-users'] }),
   })
 }
 
-/** Remove a viewer from one project (pass projectId) or all projects (omit projectId). */
+/** Grant an existing user access to one or more projects. */
+export function useGrantProjects() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ userId, projectIds }: { userId: string; projectIds: string[] }) => {
+      const res = await fetch('/api/team/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, projectIds }),
+      })
+      if (!res.ok) {
+        const body = await res.json()
+        throw new Error(body.error ?? 'Failed to grant access')
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['team-users'] }),
+  })
+}
+
+/** Remove a user from one project (pass projectId) or all projects (omit projectId). */
 export function useRemoveFromProject() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -67,8 +74,6 @@ export function useRemoveFromProject() {
         throw new Error(body.error ?? 'Failed to remove')
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['project-members'] })
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['team-users'] }),
   })
 }
