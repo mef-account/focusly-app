@@ -148,14 +148,15 @@ interface MarkdownEditorProps {
   onChange: (val: string) => void
   className?: string
   defaultMode?: ViewMode
+  readOnly?: boolean
   /** Optional callback to upload a pasted image and return its public URL. */
   onImageUpload?: (file: File) => Promise<string>
 }
 
-export function MarkdownEditor({ value, onChange, className, defaultMode = 'split', onImageUpload }: MarkdownEditorProps) {
+export function MarkdownEditor({ value, onChange, className, defaultMode = 'split', readOnly = false, onImageUpload }: MarkdownEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const valueRef = useRef(value)
-  const [mode, setMode] = useState<ViewMode>(defaultMode)
+  const [mode, setMode] = useState<ViewMode>(readOnly && defaultMode === 'edit' ? 'preview' : defaultMode)
   const [html, setHtml] = useState('')
 
   // Keep valueRef in sync so async handlers always see the latest value
@@ -168,6 +169,7 @@ export function MarkdownEditor({ value, onChange, className, defaultMode = 'spli
 
   // Insert text at the current cursor position
   function insertAtCursor(text: string) {
+    if (readOnly) return
     const ta = textareaRef.current
     if (!ta) return
     const { selectionStart: start, selectionEnd: end, value: v } = ta
@@ -182,7 +184,7 @@ export function MarkdownEditor({ value, onChange, className, defaultMode = 'spli
   // Handle paste — intercept image files and upload them
   const handlePaste = useCallback(
     async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-      if (!onImageUpload) return
+      if (readOnly || !onImageUpload) return
       const imageItem = Array.from(e.clipboardData.items).find((item) =>
         item.type.startsWith('image/')
       )
@@ -198,12 +200,13 @@ export function MarkdownEditor({ value, onChange, className, defaultMode = 'spli
         onChange(valueRef.current.replace(placeholder, ''))
       }
     },
-    [onImageUpload, onChange] // eslint-disable-line react-hooks/exhaustive-deps
+    [onImageUpload, onChange, readOnly] // eslint-disable-line react-hooks/exhaustive-deps
   )
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (readOnly) return
       const ctrl = e.ctrlKey || e.metaKey
       if (!textareaRef.current) return
 
@@ -225,14 +228,14 @@ export function MarkdownEditor({ value, onChange, className, defaultMode = 'spli
         })
       }
     },
-    [onChange]
+    [onChange, readOnly]
   )
 
   return (
     <div className={cn('flex flex-col', className)}>
       {/* Toolbar */}
       <div className="flex items-center gap-1 border-b px-3 py-1.5 flex-wrap">
-        {ACTIONS.map((action, i) => {
+        {!readOnly && ACTIONS.map((action, i) => {
           if (action === 'sep') return <Separator key={i} orientation="vertical" className="mx-0.5 h-5" />
           const Icon = action.icon
           return (
@@ -254,7 +257,7 @@ export function MarkdownEditor({ value, onChange, className, defaultMode = 'spli
         })}
 
         <div className="ml-auto flex items-center rounded-lg border p-0.5 gap-0.5">
-          {(['edit', 'split', 'preview'] as ViewMode[]).map((m) => {
+          {(readOnly ? ['preview'] : ['edit', 'split', 'preview'] as ViewMode[]).map((m) => {
             const icons = { edit: Edit3, split: Columns2, preview: Eye }
             const Icon = icons[m]
             return (
@@ -290,6 +293,7 @@ export function MarkdownEditor({ value, onChange, className, defaultMode = 'spli
             placeholder="Start writing in Markdown…"
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            readOnly={readOnly}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
           />

@@ -50,6 +50,41 @@ export function AssigneePicker({
     if (stopPropagation) e.stopPropagation()
   }
 
+  if (!onChange) {
+    if (variant === 'full') {
+      return (
+        <div className={cn('flex items-center gap-1.5 px-2 py-1 text-sm', className)}>
+          {current ? (
+            <AssigneeAvatar profile={current} size="default" />
+          ) : (
+            <span className="flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground">
+              <UserPlus className="h-3.5 w-3.5" />
+            </span>
+          )}
+          <span className={cn(current ? 'text-foreground' : 'text-muted-foreground')}>
+            {current?.name ?? 'Unassigned'}
+          </span>
+        </div>
+      )
+    }
+
+    return current ? (
+      <div className={cn('p-0.5', className)} title={current.name ?? 'Assigned'}>
+        <AssigneeAvatar profile={current} />
+      </div>
+    ) : (
+      <span
+        className={cn(
+          'flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground',
+          className
+        )}
+        title="Unassigned"
+      >
+        <UserPlus className="h-3 w-3" />
+      </span>
+    )
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger

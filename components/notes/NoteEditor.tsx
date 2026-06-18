@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { MarkdownEditor } from '@/components/notes/MarkdownEditor'
 import { useNote, useUpdateNote, useDeleteNote } from '@/lib/queries/useNotes'
+import { useIsViewer } from '@/lib/hooks/useCurrentUserRole'
 import { uploadNoteImage } from '@/lib/uploadNoteImage'
 import { cn } from '@/lib/utils'
 
@@ -35,6 +36,7 @@ export function NoteEditor({ noteId, defaultMode = 'split', actions, onDeleted, 
   const { data: note } = useNote(noteId)
   const updateNote = useUpdateNote()
   const deleteNote = useDeleteNote()
+  const isViewer = useIsViewer()
 
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
@@ -52,26 +54,29 @@ export function NoteEditor({ noteId, defaultMode = 'split', actions, onDeleted, 
 
   const saveNow = useCallback(
     (patch: { title?: string; content?: string }) => {
+      if (isViewer) return
       setSaving(true)
       updateNote.mutate(
         { id: noteId, ...patch },
         { onSettled: () => setSaving(false) }
       )
     },
-    [noteId, updateNote]
+    [isViewer, noteId, updateNote]
   )
 
   function handleContentChange(val: string) {
+    if (isViewer) return
     setContent(val)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => saveNow({ content: val, title }), DEBOUNCE_MS)
   }
 
   function handleTitleBlur() {
-    if (title !== note?.title) saveNow({ title })
+    if (!isViewer && title !== note?.title) saveNow({ title })
   }
 
   function handleDelete() {
+    if (isViewer) return
     deleteNote.mutate(noteId)
     setDeleteOpen(false)
     onDeleted?.()
@@ -92,30 +97,34 @@ export function NoteEditor({ noteId, defaultMode = 'split', actions, onDeleted, 
           spellCheck
           className="h-8 flex-1 bg-transparent text-base font-semibold outline-none placeholder:text-muted-foreground"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          readOnly={isViewer}
+          onChange={(e) => !isViewer && setTitle(e.target.value)}
           onBlur={handleTitleBlur}
           placeholder="Untitled"
         />
         <span className="min-w-[52px] text-right text-[10px] text-muted-foreground">
-          {saving ? 'Saving…' : 'Saved'}
+          {isViewer ? 'Read only' : saving ? 'Saving…' : 'Saved'}
         </span>
         {actions}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-          onClick={() => setDeleteOpen(true)}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        {!isViewer && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       <MarkdownEditor
         value={content}
         onChange={handleContentChange}
-        defaultMode={defaultMode}
+        defaultMode={isViewer ? 'preview' : defaultMode}
+        readOnly={isViewer}
         className="min-h-0 flex-1 overflow-hidden"
-        onImageUpload={uploadNoteImage}
+        onImageUpload={isViewer ? undefined : uploadNoteImage}
       />
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>

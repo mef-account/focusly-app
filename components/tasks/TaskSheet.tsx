@@ -189,10 +189,10 @@ function DatePicker({ label, value, onChange }: { label: string; value: string |
 
 // ─── Sub-task row ─────────────────────────────────────────────────────────────
 
-function SubtaskRow({ task, onToggle }: { task: Task; onToggle: (id: string, done: boolean) => void }) {
+function SubtaskRow({ task, onToggle, readOnly = false }: { task: Task; onToggle: (id: string, done: boolean) => void; readOnly?: boolean }) {
   return (
     <div className="flex items-center gap-2 py-1">
-      <button onClick={() => onToggle(task.id, task.status !== 'done')}>
+      <button disabled={readOnly} onClick={() => onToggle(task.id, task.status !== 'done')}>
         {task.status === 'done' ? (
           <Check className="h-4 w-4 text-green-500" />
         ) : (
@@ -315,13 +315,13 @@ export function TaskSheet() {
   }, [activeTaskId])
 
   function patch(updates: Partial<Task>) {
-    if (!task) return
+    if (!task || isViewer) return
     setTask({ ...task, ...updates })
     updateTask.mutate({ id: task.id, ...updates })
   }
 
   async function handleNewNote() {
-    if (!task) return
+    if (!task || isViewer) return
     const note = await createNote.mutateAsync({
       note_type: 'task',
       task_id: task.id,
@@ -332,7 +332,7 @@ export function TaskSheet() {
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    if (!task || !e.target.files?.length) return
+    if (!task || isViewer || !e.target.files?.length) return
     const files = Array.from(e.target.files)
     e.target.value = ''
     for (const file of files) {
@@ -358,7 +358,7 @@ export function TaskSheet() {
   }
 
   async function addSubtask() {
-    if (!newSubtask.trim() || !task) return
+    if (!newSubtask.trim() || !task || isViewer) return
     const { data } = await supabase
       .from('tasks')
       .insert({ title: newSubtask.trim(), project_id: task.project_id, parent_task_id: task.id, status: 'todo', priority: 'none' })
@@ -369,12 +369,13 @@ export function TaskSheet() {
   }
 
   async function toggleSubtask(id: string, done: boolean) {
+    if (isViewer) return
     await supabase.from('tasks').update({ status: done ? 'done' : 'todo' }).eq('id', id)
     setSubtasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: done ? 'done' : 'todo' } : t)))
   }
 
   async function addComment() {
-    if (!newComment.trim() || !task) return
+    if (!newComment.trim() || !task || isViewer) return
     const { data: { user } } = await supabase.auth.getUser()
     const { data } = await supabase
       .from('comments')
@@ -386,7 +387,7 @@ export function TaskSheet() {
   }
 
   async function sendEmail() {
-    if (!task || !emailTo.trim() || !emailBody.trim()) return
+    if (!task || isViewer || !emailTo.trim() || !emailBody.trim()) return
     setSendingEmail(true)
     try {
       const toList = emailTo.split(',').map((e) => e.trim()).filter(Boolean)
@@ -482,8 +483,9 @@ export function TaskSheet() {
               <input
                 className="w-full bg-transparent text-2xl font-bold outline-none placeholder:text-muted-foreground/50 leading-snug"
                 value={titleEdit}
-                onChange={(e) => setTitleEdit(e.target.value)}
-                onBlur={() => { if (titleEdit !== task.title) patch({ title: titleEdit }) }}
+                readOnly={isViewer}
+                onChange={(e) => !isViewer && setTitleEdit(e.target.value)}
+                onBlur={() => { if (!isViewer && titleEdit !== task.title) patch({ title: titleEdit }) }}
                 placeholder="Task title"
               />
             </div>
@@ -496,8 +498,9 @@ export function TaskSheet() {
                   placeholder="Add a description…"
                   className="min-h-[80px] w-full resize-none border-0 p-0 shadow-none focus-visible:ring-0 text-sm text-foreground/80 placeholder:text-muted-foreground/50 bg-transparent"
                   value={task.description ?? ''}
-                  onChange={(e) => setTask({ ...task, description: e.target.value })}
-                  onBlur={() => patch({ description: task.description })}
+                  readOnly={isViewer}
+                  onChange={(e) => !isViewer && setTask({ ...task, description: e.target.value })}
+                  onBlur={() => { if (!isViewer) patch({ description: task.description }) }}
                 />
               </div>
 
@@ -518,12 +521,14 @@ export function TaskSheet() {
                       <span className="text-xs text-muted-foreground">({attachments.length})</span>
                     )}
                   </div>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Attach file
-                  </button>
+                  {!isViewer && (
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Attach file
+                    </button>
+                  )}
                 </div>
 
                 {/* Uploading in-progress */}
@@ -558,13 +563,15 @@ export function TaskSheet() {
                         >
                           <Download className="h-3.5 w-3.5" />
                         </button>
-                        <button
-                          title="Delete"
-                          onClick={() => deleteAttachment.mutate({ id: att.id, taskId: att.task_id, storagePath: att.storage_path })}
-                          className="text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        {!isViewer && (
+                          <button
+                            title="Delete"
+                            onClick={() => deleteAttachment.mutate({ id: att.id, taskId: att.task_id, storagePath: att.storage_path })}
+                            className="text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -581,13 +588,15 @@ export function TaskSheet() {
                       <span className="text-xs text-muted-foreground">({taskNotes.length})</span>
                     )}
                   </div>
-                  <button
-                    onClick={handleNewNote}
-                    disabled={createNote.isPending}
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> New note
-                  </button>
+                  {!isViewer && (
+                    <button
+                      onClick={handleNewNote}
+                      disabled={createNote.isPending}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> New note
+                    </button>
+                  )}
                 </div>
                 {taskNotes.length === 0 ? (
                   <p className="text-sm text-muted-foreground/60 italic">No notes yet.</p>
@@ -625,23 +634,25 @@ export function TaskSheet() {
                   )}
                 </div>
                 <div className="space-y-0.5">
-                  {subtasks.map((st) => <SubtaskRow key={st.id} task={st} onToggle={toggleSubtask} />)}
+                  {subtasks.map((st) => <SubtaskRow key={st.id} task={st} onToggle={toggleSubtask} readOnly={isViewer} />)}
                 </div>
-                <button
-                  className="mt-2 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => document.getElementById('subtask-input')?.focus()}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <input
-                    id="subtask-input"
-                    className="bg-transparent outline-none placeholder:text-muted-foreground/60 text-sm"
-                    placeholder="Add sub-issue…"
-                    value={newSubtask}
-                    onChange={(e) => setNewSubtask(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && addSubtask()}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </button>
+                {!isViewer && (
+                  <button
+                    className="mt-2 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => document.getElementById('subtask-input')?.focus()}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <input
+                      id="subtask-input"
+                      className="bg-transparent outline-none placeholder:text-muted-foreground/60 text-sm"
+                      placeholder="Add sub-issue…"
+                      value={newSubtask}
+                      onChange={(e) => setNewSubtask(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && addSubtask()}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </button>
+                )}
               </div>
 
               {/* Activity */}
@@ -816,23 +827,31 @@ export function TaskSheet() {
 
             {/* ── BOX 1: Time Tracking ── */}
             <Box title="Time Tracking">
-              <div className="pb-1">
-                <TaskTimerButton
-                  task={{ id: task.id, title: task.title, project_id: task.project_id }}
-                  variant="full"
-                />
-              </div>
+              {!isViewer && (
+                <div className="pb-1">
+                  <TaskTimerButton
+                    task={{ id: task.id, title: task.title, project_id: task.project_id }}
+                    variant="full"
+                  />
+                </div>
+              )}
               <PropRow label="Estimate">
-                <input
-                  className="w-full rounded-md px-2 py-1 text-sm bg-transparent hover:bg-accent/60 transition-colors outline-none placeholder:text-muted-foreground font-medium"
-                  placeholder="e.g. 1h 30m"
-                  value={estimateInput}
-                  onChange={(e) => setEstimateInput(e.target.value)}
-                  onBlur={() => {
-                    const mins = parseEstimate(estimateInput)
-                    if (mins !== null) patch({ estimate_minutes: mins })
-                  }}
-                />
+                {isViewer ? (
+                  <span className="px-2 py-1 text-sm font-medium text-foreground">
+                    {task.estimate_minutes ? formatMinutes(task.estimate_minutes) : '—'}
+                  </span>
+                ) : (
+                  <input
+                    className="w-full rounded-md px-2 py-1 text-sm bg-transparent hover:bg-accent/60 transition-colors outline-none placeholder:text-muted-foreground font-medium"
+                    placeholder="e.g. 1h 30m"
+                    value={estimateInput}
+                    onChange={(e) => setEstimateInput(e.target.value)}
+                    onBlur={() => {
+                      const mins = parseEstimate(estimateInput)
+                      if (mins !== null) patch({ estimate_minutes: mins })
+                    }}
+                  />
+                )}
               </PropRow>
               {loggedSeconds > 0 && (
                 <PropRow label="Logged">
@@ -846,21 +865,43 @@ export function TaskSheet() {
             {/* ── BOX 2: Properties ── */}
             <Box title="Properties">
               <PropRow label="Status">
-                <StatusPicker value={task.status} onChange={(v) => patch({ status: v })} />
+                {isViewer ? (
+                  <div className="flex items-center gap-2 px-2 py-1 text-sm">
+                    <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', STATUS_DOT[task.status])} />
+                    <span className="font-medium">{STATUS_LABELS[task.status]}</span>
+                  </div>
+                ) : (
+                  <StatusPicker value={task.status} onChange={(v) => patch({ status: v })} />
+                )}
               </PropRow>
               <PropRow label="Priority">
-                <PriorityPicker value={task.priority} onChange={(v) => patch({ priority: v })} />
+                {isViewer ? (
+                  <div className="flex items-center gap-2 px-2 py-1 text-sm">
+                    <span className={cn('h-2.5 w-2.5 rounded-sm shrink-0', PRIORITY_COLOR[task.priority])} />
+                    <span className={cn('font-medium', task.priority === 'none' ? 'text-muted-foreground' : '')}>
+                      {PRIORITY_LABELS[task.priority]}
+                    </span>
+                  </div>
+                ) : (
+                  <PriorityPicker value={task.priority} onChange={(v) => patch({ priority: v })} />
+                )}
               </PropRow>
               <PropRow label="Assignee">
                 <AssigneePicker
                   value={task.assignee_id}
                   assignee={task.assignee}
                   variant="full"
-                  onChange={(id) => patch({ assignee_id: id })}
+                  onChange={isViewer ? undefined : (id) => patch({ assignee_id: id })}
                 />
               </PropRow>
               <PropRow label="Due date">
-                <DatePicker label="Set date" value={task.due_date ?? null} onChange={(v) => patch({ due_date: v ?? undefined })} />
+                {isViewer ? (
+                  <span className="px-2 py-1 text-sm font-medium text-foreground">
+                    {task.due_date ? format(parseISO(task.due_date), 'MMM d, yyyy') : '—'}
+                  </span>
+                ) : (
+                  <DatePicker label="Set date" value={task.due_date ?? null} onChange={(v) => patch({ due_date: v ?? undefined })} />
+                )}
               </PropRow>
             </Box>
 
@@ -889,8 +930,8 @@ export function TaskSheet() {
 
               {/* Project picker */}
               <PropRow label="Project">
-                <DropdownMenu>
-                  <DropdownMenuTrigger render={<button className={PICKER_BTN} />}>
+                {isViewer ? (
+                  <div className="flex items-center gap-2 px-2 py-1 text-sm">
                     {currentProject ? (
                       <>
                         <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: currentProject.color }} />
@@ -899,48 +940,61 @@ export function TaskSheet() {
                     ) : (
                       <span className="text-muted-foreground">Add to project</span>
                     )}
-                    <ChevronDown className="ml-auto h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-64" align="start">
+                  </div>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger render={<button className={PICKER_BTN} />}>
+                      {currentProject ? (
+                        <>
+                          <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: currentProject.color }} />
+                          <span className="font-medium truncate">{currentProject.name}</span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">Add to project</span>
+                      )}
+                      <ChevronDown className="ml-auto h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-64" align="start">
 
-                    {/* No project option */}
-                    <DropdownMenuItem
-                      className="gap-2"
-                      onClick={() => {
-                        patch({ project_id: null })
-                        setFilterWorkspaceId(null)
-                        setFilterPortfolioId(null)
-                        setTask((t) => t ? { ...t, project_id: null, project: undefined } : t)
-                      }}
-                    >
-                      <span className="h-2.5 w-2.5 rounded-full border border-dashed border-muted-foreground/40 shrink-0" />
-                      <span className="text-muted-foreground">No project</span>
-                      {!task.project_id && <Check className="ml-auto h-3.5 w-3.5" />}
-                    </DropdownMenuItem>
-
-                    {/* Project list */}
-                    {filteredProjects.map((p) => (
+                      {/* No project option */}
                       <DropdownMenuItem
-                        key={p.id}
                         className="gap-2"
                         onClick={() => {
-                          patch({ project_id: p.id })
-                          setFilterWorkspaceId(p.workspace_id)
-                          setFilterPortfolioId(p.portfolio_id ?? null)
-                          setTask((t) => t ? { ...t, project_id: p.id, project: p as any } : t)
+                          patch({ project_id: null })
+                          setFilterWorkspaceId(null)
+                          setFilterPortfolioId(null)
+                          setTask((t) => t ? { ...t, project_id: null, project: undefined } : t)
                         }}
                       >
-                        <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
-                        <span className="truncate">{p.name}</span>
-                        {task.project_id === p.id && <Check className="ml-auto h-3.5 w-3.5" />}
+                        <span className="h-2.5 w-2.5 rounded-full border border-dashed border-muted-foreground/40 shrink-0" />
+                        <span className="text-muted-foreground">No project</span>
+                        {!task.project_id && <Check className="ml-auto h-3.5 w-3.5" />}
                       </DropdownMenuItem>
-                    ))}
 
-                    {filteredProjects.length === 0 && (
-                      <p className="px-3 py-2 text-sm text-muted-foreground">No projects found</p>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      {/* Project list */}
+                      {filteredProjects.map((p) => (
+                        <DropdownMenuItem
+                          key={p.id}
+                          className="gap-2"
+                          onClick={() => {
+                            patch({ project_id: p.id })
+                            setFilterWorkspaceId(p.workspace_id)
+                            setFilterPortfolioId(p.portfolio_id ?? null)
+                            setTask((t) => t ? { ...t, project_id: p.id, project: p as any } : t)
+                          }}
+                        >
+                          <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                          <span className="truncate">{p.name}</span>
+                          {task.project_id === p.id && <Check className="ml-auto h-3.5 w-3.5" />}
+                        </DropdownMenuItem>
+                      ))}
+
+                      {filteredProjects.length === 0 && (
+                        <p className="px-3 py-2 text-sm text-muted-foreground">No projects found</p>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </PropRow>
             </Box>
 

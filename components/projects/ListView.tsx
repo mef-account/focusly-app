@@ -111,7 +111,7 @@ export function ListView({
   }, [tasks])
 
   const columns: ColumnDef<Task>[] = [
-    {
+    ...(!isViewer ? [{
       id: 'select',
       header: ({ table }) => (
         <Checkbox
@@ -130,7 +130,7 @@ export function ListView({
       size: 36,
       enableSorting: false,
       enableResizing: false,
-    },
+    } as ColumnDef<Task>] : []),
     {
       id: 'task_key',
       header: 'ID',
@@ -424,7 +424,7 @@ export function ListView({
       header: '',
       size: 64,
       enableResizing: false,
-      cell: ({ row }) => <TaskTimerButton task={row.original} />,
+      cell: ({ row }) => isViewer ? null : <TaskTimerButton task={row.original} />,
       enableSorting: false,
     },
   ]
