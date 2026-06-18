@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,7 +11,8 @@ import { createClient } from '@/lib/supabase/client'
 export function LoginForm() {
   const router = useRouter()
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [code, setCode] = useState('')
+  const [codeSent, setCodeSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -37,13 +37,38 @@ export function LoginForm() {
     })
   }, [router])
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSendCode(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
 
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false },
+    })
+
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+      return
+    }
+
+    setCodeSent(true)
+    setLoading(false)
+  }
+
+  async function handleVerifyCode(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+
+    const supabase = createClient()
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: code.trim(),
+      type: 'email',
+    })
 
     if (error) {
       setError(error.message)
@@ -55,10 +80,55 @@ export function LoginForm() {
     router.refresh()
   }
 
+  if (codeSent) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <form onSubmit={handleVerifyCode} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="code">Enter code</Label>
+              <Input
+                id="code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="123456"
+                required
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                We sent a sign-in code to {email}.
+              </p>
+            </div>
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
+            <Button type="submit" className="w-full" disabled={loading || !code.trim()}>
+              {loading ? 'Verifying...' : 'Verify code'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              disabled={loading}
+              onClick={() => {
+                setCode('')
+                setCodeSent(false)
+                setError(null)
+              }}
+            >
+              Use a different email
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card>
       <CardContent className="pt-6">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSendCode} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -70,30 +140,11 @@ export function LoginForm() {
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link
-                href="/reset-password"
-                className="text-xs text-muted-foreground hover:text-primary"
-              >
-                Forgot password?
-              </Link>
-            </div>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
           {error && (
             <p className="text-sm text-destructive">{error}</p>
           )}
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Signing in…' : 'Sign in'}
+          <Button type="submit" className="w-full" disabled={loading || !email.trim()}>
+            {loading ? 'Sending...' : 'Send code'}
           </Button>
         </form>
       </CardContent>

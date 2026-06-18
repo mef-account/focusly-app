@@ -11,7 +11,7 @@ export default function LoginPage() {
         </div>
         <h1 className="text-2xl font-bold">Sign in to Focusly</h1>
         <p className="text-sm text-muted-foreground">
-          Welcome back. Enter your credentials to continue.
+          Welcome back. Enter your email to receive a sign-in code.
         </p>
       </div>
       <LoginForm />
