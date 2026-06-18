@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -15,25 +14,13 @@ import {
   ChevronRight,
   Zap,
   SquarePen,
-  Check,
-  Building2,
-  ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSidebarStore } from '@/store/useSidebarStore'
 import { useQuickCreateStore } from '@/store/useQuickCreateStore'
-import { useWorkspaceStore } from '@/store/useWorkspaceStore'
-import { useWorkspaces } from '@/lib/queries/useWorkspace'
 import { useCurrentUserRole } from '@/lib/hooks/useCurrentUserRole'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
@@ -48,22 +35,11 @@ export function Sidebar() {
   const pathname = usePathname()
   const { collapsed, toggle } = useSidebarStore()
   const openQuickCreate = useQuickCreateStore((s) => s.open)
-  const { activeWorkspaceId, setActiveWorkspace } = useWorkspaceStore()
-  const { data: workspaces = [] } = useWorkspaces()
   const role = useCurrentUserRole()
   const isAdmin = role === 'admin'
   const navItems = isAdmin
     ? NAV_ITEMS
     : NAV_ITEMS.filter((item) => item.href === '/app/projects')
-
-  // Auto-select first workspace if none stored yet
-  useEffect(() => {
-    if (!activeWorkspaceId && workspaces.length > 0) {
-      setActiveWorkspace(workspaces[0].id)
-    }
-  }, [activeWorkspaceId, workspaces, setActiveWorkspace])
-
-  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) ?? workspaces[0]
 
   return (
     <aside
@@ -174,62 +150,6 @@ export function Sidebar() {
           </TooltipTrigger>
           {collapsed && <TooltipContent side="right">Settings</TooltipContent>}
         </Tooltip>
-
-        {workspaces.length > 1 ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger render={
-              <button className={cn(
-                'flex w-full items-center gap-2 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent',
-                collapsed && 'justify-center px-2'
-              )} />
-            }>
-              <Avatar className="h-7 w-7 shrink-0">
-                <AvatarFallback className="bg-brand-100 text-brand-800 text-xs">
-                  {activeWorkspace?.name?.[0]?.toUpperCase() ?? 'W'}
-                </AvatarFallback>
-              </Avatar>
-              {!collapsed && (
-                <>
-                  <span className="flex-1 truncate text-xs text-muted-foreground">
-                    {activeWorkspace?.name ?? 'Workspace'}
-                  </span>
-                  <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
-                </>
-              )}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start" className="w-52">
-              {workspaces.map((ws) => (
-                <DropdownMenuItem
-                  key={ws.id}
-                  onClick={() => setActiveWorkspace(ws.id)}
-                  className="gap-2"
-                >
-                  <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span className="flex-1 truncate">{ws.name}</span>
-                  {activeWorkspaceId === ws.id && <Check className="h-3 w-3 shrink-0" />}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
-          <div
-            className={cn(
-              'flex items-center gap-2 rounded-md px-3 py-2',
-              collapsed && 'justify-center px-2'
-            )}
-          >
-            <Avatar className="h-7 w-7 shrink-0">
-              <AvatarFallback className="bg-brand-100 text-brand-800 text-xs">
-                {activeWorkspace?.name?.[0]?.toUpperCase() ?? 'W'}
-              </AvatarFallback>
-            </Avatar>
-            {!collapsed && (
-              <span className="truncate text-xs text-muted-foreground">
-                {activeWorkspace?.name ?? 'Workspace'}
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Collapse toggle */}
