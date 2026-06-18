@@ -81,13 +81,19 @@ export async function POST(req: NextRequest) {
     const fromName = projectName ? `${workspaceName} - ${projectName}` : workspaceName
     const fromAddress = `${fromName} <${taskEmail}>`
 
-    const emailAttachments: Attachment[] = await Promise.all(
+    // Read file buffers once — reused for both Resend and Supabase Storage
+    const fileBuffers = await Promise.all(
       files.map(async (file) => ({
-        filename: file.name,
-        content: Buffer.from(await file.arrayBuffer()).toString('base64'),
-        contentType: file.type || undefined,
+        file,
+        bytes: Buffer.from(await file.arrayBuffer()),
       }))
     )
+
+    const emailAttachments: Attachment[] = fileBuffers.map(({ file, bytes }) => ({
+      filename: file.name,
+      content: bytes.toString('base64'),
+      contentType: file.type || undefined,
+    }))
 
     // Send via Resend
     const { error: sendErr } = await resend.emails.send({
@@ -121,6 +127,39 @@ export async function POST(req: NextRequest) {
         body: commentBody,
         source: 'email',
       })
+
+    // Save outgoing attachments to Supabase Storage + task_attachments
+    for (const { file, bytes } of fileBuffers) {
+      try {
+        const safeFileName = file.name.replace(/[^\w.\- ]+/g, '_').trim() || 'attachment'
+        const storagePath = `email/${taskId}/${crypto.randomUUID()}-${safeFileName}`
+        const contentType = file.type || 'application/octet-stream'
+
+        const { error: uploadError } = await admin.storage
+          .from('attachments')
+          .upload(storagePath, bytes, { contentType })
+
+        if (uploadError) {
+          console.error('[email/send] Failed to upload attachment:', uploadError)
+          continue
+        }
+
+        const { error: insertError } = await admin.from('task_attachments').insert({
+          task_id: taskId,
+          user_id: user.id,
+          file_name: file.name,
+          file_size: file.size,
+          mime_type: contentType,
+          storage_path: storagePath,
+        })
+
+        if (insertError) {
+          console.error('[email/send] Failed to insert attachment row:', insertError)
+        }
+      } catch (err) {
+        console.error('[email/send] Unexpected attachment save error:', err)
+      }
+    }
 
     return NextResponse.json({ ok: true })
   } catch (err) {
