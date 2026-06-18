@@ -11,27 +11,25 @@ export interface WorkspaceMember {
   profiles: Pick<Profile, 'id' | 'name' | 'avatar_url'> | null
 }
 
-export function useWorkspaceMembers(workspaceId: string | null) {
+export function useWorkspaceMembers() {
   return useQuery({
-    queryKey: ['workspace-members', workspaceId],
+    queryKey: ['workspace-members'],
     queryFn: async () => {
-      if (!workspaceId) return []
-      const res = await fetch(`/api/team/invite?workspaceId=${workspaceId}`)
+      const res = await fetch('/api/team/invite')
       if (!res.ok) throw new Error(await res.text())
       return res.json() as Promise<WorkspaceMember[]>
     },
-    enabled: !!workspaceId,
   })
 }
 
-export function useInviteMember(workspaceId: string | null) {
+export function useInviteMember() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (email: string) => {
       const res = await fetch('/api/team/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, workspaceId }),
+        body: JSON.stringify({ email }),
       })
       if (!res.ok) {
         const { error } = await res.json()
@@ -39,42 +37,42 @@ export function useInviteMember(workspaceId: string | null) {
       }
       return res.json()
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspace-members', workspaceId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspace-members'] }),
   })
 }
 
-export function useRemoveMember(workspaceId: string | null) {
+export function useRemoveMember() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (memberId: string) => {
       const res = await fetch('/api/team/invite', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ memberId, workspaceId }),
+        body: JSON.stringify({ memberId }),
       })
       if (!res.ok) {
         const { error } = await res.json()
         throw new Error(error ?? 'Failed to remove member')
       }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspace-members', workspaceId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspace-members'] }),
   })
 }
 
-export function useUpdateMemberAccess(workspaceId: string | null) {
+export function useUpdateMemberAccess() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ userId, projectIds }: { userId: string; projectIds: string[] }) => {
       const res = await fetch('/api/team/access', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, projectIds, workspaceId }),
+        body: JSON.stringify({ userId, projectIds }),
       })
       if (!res.ok) {
         const { error } = await res.json()
         throw new Error(error ?? 'Failed to update access')
       }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspace-members', workspaceId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspace-members'] }),
   })
 }

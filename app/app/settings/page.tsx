@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Users, UserPlus, FolderKanban, X, ChevronDown, ChevronRight, Check, Loader2, Shield, User } from 'lucide-react'
+import { Users, UserPlus, FolderKanban, Building2, X, ChevronDown, ChevronRight, Check, Loader2, Shield, User } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -9,7 +9,6 @@ import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useWorkspaces } from '@/lib/queries/useWorkspace'
 import { useProjects } from '@/lib/queries/useProjects'
 import { usePortfolios } from '@/lib/queries/usePortfolios'
-import { useWorkspaceStore } from '@/store/useWorkspaceStore'
 import { useCurrentUserRole } from '@/lib/hooks/useCurrentUserRole'
 import {
   useWorkspaceMembers,
@@ -18,7 +17,7 @@ import {
   useUpdateMemberAccess,
   type WorkspaceMember,
 } from '@/lib/queries/useTeam'
-import type { Portfolio, Project } from '@/types'
+import type { Project } from '@/types'
 
 type Tab = 'account' | 'team'
 
@@ -84,13 +83,12 @@ function AccountTab() {
 // ─── Team Tab ─────────────────────────────────────────────────────────────────
 
 function TeamTab() {
-  const { activeWorkspaceId } = useWorkspaceStore()
   const role = useCurrentUserRole()
   const isAdmin = role === 'admin'
 
-  const { data: members = [], isLoading } = useWorkspaceMembers(activeWorkspaceId)
-  const invite = useInviteMember(activeWorkspaceId)
-  const removeMember = useRemoveMember(activeWorkspaceId)
+  const { data: members = [], isLoading } = useWorkspaceMembers()
+  const invite = useInviteMember()
+  const removeMember = useRemoveMember()
 
   const [email, setEmail] = useState('')
   const [inviteError, setInviteError] = useState<string | null>(null)
@@ -177,7 +175,6 @@ function TeamTab() {
       {managingMember && (
         <ManageAccessDialog
           member={managingMember}
-          workspaceId={activeWorkspaceId!}
           onClose={() => setManagingMember(null)}
         />
       )}
@@ -238,26 +235,24 @@ function MemberRow({
 
 function ManageAccessDialog({
   member,
-  workspaceId,
   onClose,
 }: {
   member: WorkspaceMember
-  workspaceId: string
   onClose: () => void
 }) {
   const { data: allProjects = [] } = useProjects()
   const { data: portfolios = [] } = usePortfolios()
-  const updateAccess = useUpdateMemberAccess(workspaceId)
-
-  const wsProjects = allProjects.filter((p) => p.workspace_id === workspaceId)
-  const wsPortfolios = portfolios.filter((p) => p.workspace_id === workspaceId)
+  const { data: workspaces = [] } = useWorkspaces()
+  const updateAccess = useUpdateMemberAccess()
 
   const [selected, setSelected] = useState<Set<string>>(new Set(member.project_ids))
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(wsPortfolios.map((p) => p.id)))
+  const [expandedWs, setExpandedWs] = useState<Set<string>>(new Set(workspaces.map((w) => w.id)))
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  const unassigned = wsProjects.filter((p) => !p.portfolio_id)
+  const sortedWorkspaces = [...workspaces].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+  )
 
   function toggleProject(projectId: string) {
     setSelected((prev) => {
@@ -268,11 +263,8 @@ function ManageAccessDialog({
     })
   }
 
-  function togglePortfolio(portfolio: Portfolio) {
-    const projectIds = wsProjects
-      .filter((p) => p.portfolio_id === portfolio.id)
-      .map((p) => p.id)
-    const allChecked = projectIds.every((id) => selected.has(id))
+  function toggleIds(projectIds: string[]) {
+    const allChecked = projectIds.length > 0 && projectIds.every((id) => selected.has(id))
     setSelected((prev) => {
       const next = new Set(prev)
       for (const id of projectIds) {
@@ -283,15 +275,21 @@ function ManageAccessDialog({
     })
   }
 
-  function portfolioCheckedState(portfolio: Portfolio): 'all' | 'some' | 'none' {
-    const projectIds = wsProjects
-      .filter((p) => p.portfolio_id === portfolio.id)
-      .map((p) => p.id)
+  function checkedState(projectIds: string[]): 'all' | 'some' | 'none' {
     if (projectIds.length === 0) return 'none'
     const checked = projectIds.filter((id) => selected.has(id))
     if (checked.length === projectIds.length) return 'all'
     if (checked.length > 0) return 'some'
     return 'none'
+  }
+
+  function toggleWs(id: string) {
+    setExpandedWs((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   async function handleSave() {
@@ -317,98 +315,110 @@ function ManageAccessDialog({
           </p>
         </div>
 
-        <div className="max-h-[50vh] overflow-y-auto space-y-2">
-          {wsPortfolios.map((portfolio) => {
-            const portfolioProjects = wsProjects.filter((p) => p.portfolio_id === portfolio.id)
-            const state = portfolioCheckedState(portfolio)
-            const open = expanded.has(portfolio.id)
+        <div className="max-h-[55vh] overflow-y-auto space-y-3">
+          {sortedWorkspaces.map((ws) => {
+            const wsProjects = allProjects.filter((p) => p.workspace_id === ws.id)
+            const wsPortfolios = portfolios
+              .filter((p) => p.workspace_id === ws.id)
+              .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+            const unassigned = wsProjects.filter((p) => !p.portfolio_id)
+            const wsState = checkedState(wsProjects.map((p) => p.id))
+            const wsOpen = expandedWs.has(ws.id)
+
+            if (wsProjects.length === 0) return null
 
             return (
-              <div key={portfolio.id} className="rounded-md border border-border">
-                {/* Portfolio header */}
-                <div className="flex items-center gap-2 px-3 py-2">
+              <div key={ws.id} className="rounded-lg border border-border">
+                {/* Workspace header */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-muted/40 rounded-t-lg">
                   <button
-                    onClick={() => togglePortfolio(portfolio)}
+                    onClick={() => toggleIds(wsProjects.map((p) => p.id))}
                     className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-                      state === 'all'
+                      wsState === 'all'
                         ? 'border-primary bg-primary text-primary-foreground'
-                        : state === 'some'
+                        : wsState === 'some'
                         ? 'border-primary bg-primary/30'
                         : 'border-input bg-background'
                     }`}
                   >
-                    {state !== 'none' && <Check className="h-3 w-3" />}
+                    {wsState !== 'none' && <Check className="h-3 w-3" />}
                   </button>
-                  <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span
-                    className="flex-1 text-sm font-medium cursor-pointer"
-                    onClick={() =>
-                      setExpanded((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(portfolio.id)) next.delete(portfolio.id)
-                        else next.add(portfolio.id)
-                        return next
-                      })
-                    }
-                  >
-                    {portfolio.name}
+                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="flex-1 text-sm font-semibold cursor-pointer" onClick={() => toggleWs(ws.id)}>
+                    {ws.name}
                   </span>
-                  <span className="text-xs text-muted-foreground">{portfolioProjects.length} projects</span>
-                  <button
-                    onClick={() =>
-                      setExpanded((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(portfolio.id)) next.delete(portfolio.id)
-                        else next.add(portfolio.id)
-                        return next
-                      })
-                    }
-                    className="text-muted-foreground"
-                  >
-                    {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                  <button onClick={() => toggleWs(ws.id)} className="text-muted-foreground">
+                    {wsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                   </button>
                 </div>
 
-                {/* Portfolio projects */}
-                {open && portfolioProjects.length > 0 && (
-                  <div className="border-t border-border divide-y divide-border">
-                    {portfolioProjects.map((project) => (
-                      <ProjectRow
-                        key={project.id}
-                        project={project}
-                        checked={selected.has(project.id)}
-                        onToggle={() => toggleProject(project.id)}
-                      />
-                    ))}
+                {wsOpen && (
+                  <div className="p-2 space-y-2">
+                    {wsPortfolios.map((portfolio) => {
+                      const portfolioProjects = wsProjects.filter((p) => p.portfolio_id === portfolio.id)
+                      if (portfolioProjects.length === 0) return null
+                      const state = checkedState(portfolioProjects.map((p) => p.id))
+
+                      return (
+                        <div key={portfolio.id} className="rounded-md border border-border">
+                          <div className="flex items-center gap-2 px-3 py-2">
+                            <button
+                              onClick={() => toggleIds(portfolioProjects.map((p) => p.id))}
+                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+                                state === 'all'
+                                  ? 'border-primary bg-primary text-primary-foreground'
+                                  : state === 'some'
+                                  ? 'border-primary bg-primary/30'
+                                  : 'border-input bg-background'
+                              }`}
+                            >
+                              {state !== 'none' && <Check className="h-3 w-3" />}
+                            </button>
+                            <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="flex-1 text-sm font-medium">{portfolio.name}</span>
+                            <span className="text-xs text-muted-foreground">{portfolioProjects.length}</span>
+                          </div>
+                          <div className="border-t border-border divide-y divide-border">
+                            {portfolioProjects.map((project) => (
+                              <ProjectRow
+                                key={project.id}
+                                project={project}
+                                checked={selected.has(project.id)}
+                                onToggle={() => toggleProject(project.id)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+
+                    {unassigned.length > 0 && (
+                      <div className="rounded-md border border-border">
+                        <div className="px-3 py-2">
+                          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            No portfolio
+                          </span>
+                        </div>
+                        <div className="border-t border-border divide-y divide-border">
+                          {unassigned.map((project) => (
+                            <ProjectRow
+                              key={project.id}
+                              project={project}
+                              checked={selected.has(project.id)}
+                              onToggle={() => toggleProject(project.id)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )
           })}
 
-          {/* Unassigned projects */}
-          {unassigned.length > 0 && (
-            <div className="rounded-md border border-border">
-              <div className="px-3 py-2">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  No portfolio
-                </span>
-              </div>
-              <div className="border-t border-border divide-y divide-border">
-                {unassigned.map((project) => (
-                  <ProjectRow
-                    key={project.id}
-                    project={project}
-                    checked={selected.has(project.id)}
-                    onToggle={() => toggleProject(project.id)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {wsProjects.length === 0 && (
-            <p className="py-4 text-center text-sm text-muted-foreground">No projects in this workspace.</p>
+          {allProjects.length === 0 && (
+            <p className="py-4 text-center text-sm text-muted-foreground">No projects yet.</p>
           )}
         </div>
 

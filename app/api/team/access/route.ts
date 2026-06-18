@@ -2,54 +2,56 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
-async function verifyOwner(workspaceId: string) {
+/** Returns the authenticated admin, their owned project IDs, or null. */
+async function getAdminContext() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
-  // Use admin client to bypass RLS for ownership check
   const adminClient = createAdminClient()
-  const { data: workspace } = await adminClient
+  const { data: workspaces } = await adminClient
     .from('workspaces')
     .select('id')
-    .eq('id', workspaceId)
     .eq('owner_id', user.id)
-    .single()
-  return workspace ? user : null
-}
+  const ownedWorkspaceIds = (workspaces ?? []).map((w: { id: string }) => w.id)
 
-// POST — grant a set of project_ids to a user
-export async function POST(req: NextRequest) {
-  try {
-    const { userId, projectIds, workspaceId } = await req.json()
-    if (!userId || !workspaceId || !Array.isArray(projectIds)) {
-      return NextResponse.json({ error: 'userId, workspaceId, and projectIds are required' }, { status: 400 })
-    }
-
-    const user = await verifyOwner(workspaceId)
-    if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
-    const adminClient = createAdminClient()
-
-    // Delete existing access for this user in this workspace, then re-insert
-    // First, get all project IDs in this workspace
-    const { data: workspaceProjects } = await adminClient
+  let adminProjectIds: string[] = []
+  if (ownedWorkspaceIds.length > 0) {
+    const { data: projects } = await adminClient
       .from('projects')
       .select('id')
-      .eq('workspace_id', workspaceId)
+      .in('workspace_id', ownedWorkspaceIds)
+    adminProjectIds = (projects ?? []).map((p: { id: string }) => p.id)
+  }
+  return { user, adminClient, adminProjectIds }
+}
 
-    const workspaceProjectIds = (workspaceProjects ?? []).map((p: any) => p.id)
+// POST — set the exact set of projects a viewer can access (across all admin workspaces)
+export async function POST(req: NextRequest) {
+  try {
+    const { userId, projectIds } = await req.json()
+    if (!userId || !Array.isArray(projectIds)) {
+      return NextResponse.json({ error: 'userId and projectIds are required' }, { status: 400 })
+    }
 
-    if (workspaceProjectIds.length > 0) {
+    const ctx = await getAdminContext()
+    if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { user, adminClient, adminProjectIds } = ctx
+
+    // Only allow granting projects the admin actually owns
+    const allowed = new Set(adminProjectIds)
+    const validProjectIds = (projectIds as string[]).filter((id) => allowed.has(id))
+
+    // Replace all of this viewer's access among the admin's projects
+    if (adminProjectIds.length > 0) {
       await adminClient
         .from('project_access')
         .delete()
         .eq('user_id', userId)
-        .in('project_id', workspaceProjectIds)
+        .in('project_id', adminProjectIds)
     }
 
-    // Insert new access rows
-    if (projectIds.length > 0) {
-      const rows = projectIds.map((projectId: string) => ({
+    if (validProjectIds.length > 0) {
+      const rows = validProjectIds.map((projectId) => ({
         user_id: userId,
         project_id: projectId,
         granted_by: user.id,
