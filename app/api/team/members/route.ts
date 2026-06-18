@@ -26,32 +26,40 @@ export async function GET(req: NextRequest) {
 
     const projectId = req.nextUrl.searchParams.get('projectId')
 
-    let query = adminClient
+    // Fetch members (no join — avoids FK name mismatch issues)
+    let membersQuery = adminClient
       .from('project_members')
-      .select('project_id, user_id, role, created_at, profiles!project_members_user_id_fkey(id, name, avatar_url)')
+      .select('project_id, user_id, role, created_at')
       .order('created_at', { ascending: true })
+    if (projectId) membersQuery = membersQuery.eq('project_id', projectId)
 
-    if (projectId) {
-      query = query.eq('project_id', projectId)
-    }
+    const { data: members, error: membersError } = await membersQuery
+    if (membersError) return NextResponse.json({ error: membersError.message }, { status: 500 })
+    if (!members || members.length === 0) return NextResponse.json([])
 
-    const { data, error } = await query
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    // Enrich with auth email
-    const { data: users } = await adminClient.auth.admin.listUsers()
+    // Enrich with auth emails
+    const { data: authUsers } = await adminClient.auth.admin.listUsers()
     const emailMap: Record<string, string> = {}
-    for (const u of users?.users ?? []) {
+    for (const u of authUsers?.users ?? []) {
       if (u.email) emailMap[u.id] = u.email
     }
 
-    const result = (data ?? []).map((m: any) => ({
+    // Fetch profiles for all user_ids
+    const userIds = [...new Set(members.map((m: any) => m.user_id))]
+    const { data: profiles } = await adminClient
+      .from('profiles')
+      .select('id, name, avatar_url')
+      .in('id', userIds)
+    const profileMap: Record<string, { id: string; name: string | null; avatar_url: string | null }> = {}
+    for (const p of profiles ?? []) profileMap[p.id] = p
+
+    const result = members.map((m: any) => ({
       project_id: m.project_id,
       user_id: m.user_id,
       role: m.role,
       created_at: m.created_at,
       email: emailMap[m.user_id] ?? null,
-      profiles: m.profiles,
+      profiles: profileMap[m.user_id] ?? null,
     }))
 
     return NextResponse.json(result)
