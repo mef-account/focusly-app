@@ -11,34 +11,35 @@ export function useProjects() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return []
 
-      // Workspace IDs the user owns (admin)
+      // Workspace IDs the user OWNS (admin)
       const { data: owned } = await supabase
         .from('workspaces').select('id').eq('owner_id', user.id)
       const ownedWsIds = (owned ?? []).map((w: { id: string }) => w.id)
 
-      // Workspace IDs the user is a member of (viewer)
-      const { data: memberships } = await supabase
-        .from('workspace_members').select('workspace_id').eq('user_id', user.id)
-      const memberWsIds = (memberships ?? []).map((m: { workspace_id: string }) => m.workspace_id)
+      const isAdmin = ownedWsIds.length > 0
 
-      // Explicit project IDs the viewer has access to
-      const { data: access } = await supabase
-        .from('project_access').select('project_id').eq('user_id', user.id)
-      const accessProjIds = (access ?? []).map((a: { project_id: string }) => a.project_id)
+      let query
+      if (isAdmin) {
+        // Admin: see all projects in their owned workspaces
+        query = supabase
+          .from('projects')
+          .select('*, tasks(status, due_date)')
+          .in('workspace_id', ownedWsIds)
+          .order('created_at', { ascending: false })
+      } else {
+        // Viewer: ONLY explicitly granted projects
+        const { data: access } = await supabase
+          .from('project_access').select('project_id').eq('user_id', user.id)
+        const accessProjIds = (access ?? []).map((a: { project_id: string }) => a.project_id)
+        if (accessProjIds.length === 0) return []
+        query = supabase
+          .from('projects')
+          .select('*, tasks(status, due_date)')
+          .in('id', accessProjIds)
+          .order('created_at', { ascending: false })
+      }
 
-      const wsIds = [...new Set([...ownedWsIds, ...memberWsIds])]
-      if (wsIds.length === 0 && accessProjIds.length === 0) return []
-
-      // Build OR filter: projects in user's workspaces OR explicitly granted projects
-      const filters: string[] = []
-      if (wsIds.length > 0) filters.push(`workspace_id.in.(${wsIds.join(',')})`)
-      if (accessProjIds.length > 0) filters.push(`id.in.(${accessProjIds.join(',')})`)
-
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*, tasks(status, due_date)')
-        .or(filters.join(','))
-        .order('created_at', { ascending: false })
+      const { data, error } = await query
       if (error) throw error
 
       return (data ?? []).map((p: any) => {

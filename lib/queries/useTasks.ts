@@ -23,35 +23,24 @@ export function useTasks(projectId?: string) {
       if (projectId) {
         q = q.eq('project_id', projectId)
       } else {
-        // Filter to user's accessible workspaces + explicit project access
+        // Determine if admin or viewer
         const { data: owned } = await supabase
           .from('workspaces').select('id').eq('owner_id', user.id)
         const ownedWsIds = (owned ?? []).map((w: { id: string }) => w.id)
 
-        const { data: memberships } = await supabase
-          .from('workspace_members').select('workspace_id').eq('user_id', user.id)
-        const memberWsIds = (memberships ?? []).map((m: { workspace_id: string }) => m.workspace_id)
+        let accessibleProjIds: string[]
+        if (ownedWsIds.length > 0) {
+          // Admin: all projects in owned workspaces
+          const { data: projData } = await supabase
+            .from('projects').select('id').in('workspace_id', ownedWsIds)
+          accessibleProjIds = (projData ?? []).map((p: { id: string }) => p.id)
+        } else {
+          // Viewer: only explicitly granted projects
+          const { data: access } = await supabase
+            .from('project_access').select('project_id').eq('user_id', user.id)
+          accessibleProjIds = (access ?? []).map((a: { project_id: string }) => a.project_id)
+        }
 
-        const { data: access } = await supabase
-          .from('project_access').select('project_id').eq('user_id', user.id)
-        const accessProjIds = (access ?? []).map((a: { project_id: string }) => a.project_id)
-
-        const wsIds = [...new Set([...ownedWsIds, ...memberWsIds])]
-        const filters: string[] = []
-        if (wsIds.length > 0) filters.push(`project_id.in.(select:id:projects?workspace_id=in.(${wsIds.join(',')}))`)
-        if (accessProjIds.length > 0) filters.push(`project_id.in.(${accessProjIds.join(',')})`)
-
-        if (filters.length === 0) return []
-
-        // Simpler: filter by workspace via join on project
-        // Since tasks have project_id, we filter projects first then get task project_ids
-        const projFilters: string[] = []
-        if (wsIds.length > 0) projFilters.push(`workspace_id.in.(${wsIds.join(',')})`)
-        if (accessProjIds.length > 0) projFilters.push(`id.in.(${accessProjIds.join(',')})`)
-
-        const { data: accessibleProjects } = await supabase
-          .from('projects').select('id').or(projFilters.join(','))
-        const accessibleProjIds = (accessibleProjects ?? []).map((p: { id: string }) => p.id)
         if (accessibleProjIds.length === 0) return []
         q = q.in('project_id', accessibleProjIds)
       }

@@ -11,23 +11,39 @@ export function usePortfolios() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return []
 
-      // Get workspace IDs the user owns (admin)
+      // Workspace IDs the user owns (admin)
       const { data: owned } = await supabase
         .from('workspaces').select('id').eq('owner_id', user.id)
       const ownedIds = (owned ?? []).map((w: { id: string }) => w.id)
 
-      // Get workspace IDs the user is a member of (viewer)
-      const { data: memberships } = await supabase
-        .from('workspace_members').select('workspace_id').eq('user_id', user.id)
-      const memberIds = (memberships ?? []).map((m: { workspace_id: string }) => m.workspace_id)
+      if (ownedIds.length > 0) {
+        // Admin: all portfolios in owned workspaces
+        const { data, error } = await supabase
+          .from('portfolios')
+          .select('*, owner:profiles!owner_id(id,name,avatar_url)')
+          .in('workspace_id', ownedIds)
+          .order('created_at', { ascending: false })
+        if (error) throw error
+        return data as Portfolio[]
+      }
 
-      const wsIds = [...new Set([...ownedIds, ...memberIds])]
-      if (wsIds.length === 0) return []
+      // Viewer: only portfolios that contain their granted projects
+      const { data: access } = await supabase
+        .from('project_access').select('project_id').eq('user_id', user.id)
+      const accessProjIds = (access ?? []).map((a: { project_id: string }) => a.project_id)
+      if (accessProjIds.length === 0) return []
+
+      const { data: projects } = await supabase
+        .from('projects').select('portfolio_id').in('id', accessProjIds)
+      const portfolioIds = [...new Set(
+        (projects ?? []).map((p: { portfolio_id: string | null }) => p.portfolio_id).filter(Boolean) as string[]
+      )]
+      if (portfolioIds.length === 0) return []
 
       const { data, error } = await supabase
         .from('portfolios')
         .select('*, owner:profiles!owner_id(id,name,avatar_url)')
-        .in('workspace_id', wsIds)
+        .in('id', portfolioIds)
         .order('created_at', { ascending: false })
       if (error) throw error
       return data as Portfolio[]
