@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Sheet, SheetContent, SheetHeader } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -234,6 +235,7 @@ export function TaskSheet() {
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
   const isViewer = useIsViewer()
+  const queryClient = useQueryClient()
 
   const { data: allProjects = [] } = useProjects()
   const { data: workspaces = [] } = useWorkspaces()
@@ -421,7 +423,8 @@ export function TaskSheet() {
       })
       if (!res.ok) throw new Error('Send failed')
       toast.success('Email sent')
-      // Refresh comments to show the sent email
+      // Refresh comments and attachments
+      queryClient.invalidateQueries({ queryKey: ['attachments', 'by-task', task.id] })
       const { data } = await supabase
         .from('comments')
         .select('*, author:profiles(id,name,avatar_url)')
