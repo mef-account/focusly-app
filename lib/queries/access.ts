@@ -28,11 +28,35 @@ export async function getAccessScope(): Promise<AccessScope> {
     return { userId: null, isViewer: false, ownedWorkspaceIds: [], accessibleProjectIds: [] }
   }
 
+  // Workspaces this user owns (every signup gets an auto-created personal one)
+  const { data: owned } = await supabase
+    .from('workspaces')
+    .select('id')
+    .eq('owner_id', user.id)
+  const ownedWorkspaceIds = (owned ?? []).map((w: { id: string }) => w.id)
+
+  // Does the user own any workspace that actually contains projects?
+  // This distinguishes a real account owner (admin) from a viewer whose only
+  // owned workspace is the empty auto-created "My Workspace".
+  let ownsProjects = false
+  if (ownedWorkspaceIds.length > 0) {
+    const { data: ownProjects } = await supabase
+      .from('projects')
+      .select('id')
+      .in('workspace_id', ownedWorkspaceIds)
+      .limit(1)
+    ownsProjects = (ownProjects ?? []).length > 0
+  }
+
+  // Was this user invited as a viewer?
   const { data: memberRows } = await supabase
     .from('workspace_members')
     .select('role')
     .eq('user_id', user.id)
-  const isViewer = (memberRows ?? []).some((m: { role: string }) => m.role === 'viewer')
+  const hasViewerMembership = (memberRows ?? []).some((m: { role: string }) => m.role === 'viewer')
+
+  // Viewer only when invited AND they don't own real project data of their own.
+  const isViewer = hasViewerMembership && !ownsProjects
 
   if (isViewer) {
     const { data: access } = await supabase
@@ -43,10 +67,5 @@ export async function getAccessScope(): Promise<AccessScope> {
     return { userId: user.id, isViewer: true, ownedWorkspaceIds: [], accessibleProjectIds }
   }
 
-  const { data: owned } = await supabase
-    .from('workspaces')
-    .select('id')
-    .eq('owner_id', user.id)
-  const ownedWorkspaceIds = (owned ?? []).map((w: { id: string }) => w.id)
   return { userId: user.id, isViewer: false, ownedWorkspaceIds, accessibleProjectIds: [] }
 }
