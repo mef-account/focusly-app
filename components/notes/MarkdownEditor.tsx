@@ -158,6 +158,7 @@ export function MarkdownEditor({ value, onChange, className, defaultMode = 'spli
   const valueRef = useRef(value)
   const [mode, setMode] = useState<ViewMode>(readOnly && defaultMode === 'edit' ? 'preview' : defaultMode)
   const [html, setHtml] = useState('')
+  const availableModes: ViewMode[] = readOnly ? ['preview'] : ['edit', 'split', 'preview']
 
   // Keep valueRef in sync so async handlers always see the latest value
   useEffect(() => { valueRef.current = value }, [value])
@@ -257,7 +258,7 @@ export function MarkdownEditor({ value, onChange, className, defaultMode = 'spli
         })}
 
         <div className="ml-auto flex items-center rounded-lg border p-0.5 gap-0.5">
-          {(readOnly ? ['preview'] : ['edit', 'split', 'preview'] as ViewMode[]).map((m) => {
+          {availableModes.map((m) => {
             const icons = { edit: Edit3, split: Columns2, preview: Eye }
             const Icon = icons[m]
             return (
