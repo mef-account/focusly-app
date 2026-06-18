@@ -9,12 +9,14 @@ export function useProjects() {
     queryKey: ['projects'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser()
+      console.debug('[useProjects] user.id =', user?.id)
       if (!user) return []
 
       // Workspace IDs the user OWNS (admin)
-      const { data: owned } = await supabase
+      const { data: owned, error: ownedErr } = await supabase
         .from('workspaces').select('id').eq('owner_id', user.id)
       const ownedWsIds = (owned ?? []).map((w: { id: string }) => w.id)
+      console.debug('[useProjects] ownedWsIds =', ownedWsIds, 'err =', ownedErr)
 
       const isAdmin = ownedWsIds.length > 0
 
@@ -28,9 +30,10 @@ export function useProjects() {
           .order('created_at', { ascending: false })
       } else {
         // Viewer: ONLY explicitly granted projects
-        const { data: access } = await supabase
+        const { data: access, error: accessErr } = await supabase
           .from('project_access').select('project_id').eq('user_id', user.id)
         const accessProjIds = (access ?? []).map((a: { project_id: string }) => a.project_id)
+        console.debug('[useProjects] viewer accessProjIds =', accessProjIds, 'err =', accessErr)
         if (accessProjIds.length === 0) return []
         query = supabase
           .from('projects')
@@ -40,6 +43,7 @@ export function useProjects() {
       }
 
       const { data, error } = await query
+      console.debug('[useProjects] final projects count =', data?.length, 'err =', error)
       if (error) throw error
 
       return (data ?? []).map((p: any) => {
