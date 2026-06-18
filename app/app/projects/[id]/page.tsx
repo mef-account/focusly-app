@@ -38,9 +38,11 @@ export default function ProjectDetailPage({ params }: PageProps) {
   const openQuickCreate = useQuickCreateStore((s) => s.open)
   const isViewer = useIsViewer()
 
-  const view = (searchParams.get('view') ?? 'list') as 'board' | 'list'
+  const requestedView = (searchParams.get('view') ?? 'list') as 'board' | 'list' | 'timeline'
+  const view = isViewer && requestedView === 'board' ? 'list' : requestedView
 
   function setView(v: string) {
+    if (isViewer && v === 'board') return
     router.replace(`/app/projects/${id}?view=${v}`)
   }
 
@@ -55,7 +57,7 @@ export default function ProjectDetailPage({ params }: PageProps) {
   }, [project])
 
   async function handleNewNote() {
-    if (!project || createNote.isPending) return
+    if (!project || isViewer || createNote.isPending) return
     try {
       const note = await createNote.mutateAsync({
         note_type: 'project',
@@ -100,8 +102,10 @@ export default function ProjectDetailPage({ params }: PageProps) {
           placeholder="Add a description…"
           className="min-h-[60px] w-full resize-none border-0 p-0 shadow-none focus-visible:ring-0 text-sm text-foreground/80 placeholder:text-muted-foreground/50 bg-transparent"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          readOnly={isViewer}
+          onChange={(e) => !isViewer && setDescription(e.target.value)}
           onBlur={() => {
+            if (isViewer) return
             const trimmed = description.trim() || null
             if (trimmed !== (project.description ?? null)) {
               updateProject.mutate({ id, description: trimmed })
@@ -183,22 +187,24 @@ export default function ProjectDetailPage({ params }: PageProps) {
       {/* Tabs */}
       <Tabs value={view} onValueChange={setView} className="flex flex-1 flex-col">
         <TabsList className="w-fit">
-          <TabsTrigger value="board">Board</TabsTrigger>
+          {!isViewer && <TabsTrigger value="board">Board</TabsTrigger>}
           <TabsTrigger value="list">List</TabsTrigger>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="board" className="flex-1 overflow-x-auto pt-2">
-          {tasksLoading ? (
-            <div className="flex gap-4">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-64 w-64 rounded-xl shrink-0" />
-              ))}
-            </div>
-          ) : (
-            <BoardView tasks={tasks} projectId={id} workspaceId={project?.workspace_id ?? null} timeTotals={timeTotals} noteCounts={noteCounts} />
-          )}
-        </TabsContent>
+        {!isViewer && (
+          <TabsContent value="board" className="flex-1 overflow-x-auto pt-2">
+            {tasksLoading ? (
+              <div className="flex gap-4">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-64 w-64 rounded-xl shrink-0" />
+                ))}
+              </div>
+            ) : (
+              <BoardView tasks={tasks} projectId={id} workspaceId={project?.workspace_id ?? null} timeTotals={timeTotals} noteCounts={noteCounts} />
+            )}
+          </TabsContent>
+        )}
 
         <TabsContent value="list" className="pt-2">
           {tasksLoading ? (
