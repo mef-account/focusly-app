@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, addDays } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
+import { getAccessScope } from '@/lib/queries/access'
 import { toError } from '@/lib/supabase/errors'
 import { toast } from 'sonner'
 import type { Task } from '@/types'
@@ -23,22 +24,18 @@ export function useTasks(projectId?: string) {
       if (projectId) {
         q = q.eq('project_id', projectId)
       } else {
-        // Determine if admin or viewer
-        const { data: owned } = await supabase
-          .from('workspaces').select('id').eq('owner_id', user.id)
-        const ownedWsIds = (owned ?? []).map((w: { id: string }) => w.id)
+        const scope = await getAccessScope()
 
         let accessibleProjIds: string[]
-        if (ownedWsIds.length > 0) {
-          // Admin: all projects in owned workspaces
-          const { data: projData } = await supabase
-            .from('projects').select('id').in('workspace_id', ownedWsIds)
-          accessibleProjIds = (projData ?? []).map((p: { id: string }) => p.id)
-        } else {
+        if (scope.isViewer) {
           // Viewer: only explicitly granted projects
-          const { data: access } = await supabase
-            .from('project_access').select('project_id').eq('user_id', user.id)
-          accessibleProjIds = (access ?? []).map((a: { project_id: string }) => a.project_id)
+          accessibleProjIds = scope.accessibleProjectIds
+        } else {
+          // Admin: all projects in owned workspaces
+          if (scope.ownedWorkspaceIds.length === 0) return []
+          const { data: projData } = await supabase
+            .from('projects').select('id').in('workspace_id', scope.ownedWorkspaceIds)
+          accessibleProjIds = (projData ?? []).map((p: { id: string }) => p.id)
         }
 
         if (accessibleProjIds.length === 0) return []

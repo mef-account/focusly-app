@@ -1,42 +1,26 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useWorkspaceStore } from '@/store/useWorkspaceStore'
-import { useWorkspaces } from '@/lib/queries/useWorkspace'
+import { useQuery } from '@tanstack/react-query'
+import { getAccessScope } from '@/lib/queries/access'
 
 /**
- * Returns the current user's role in the active workspace.
- * 'admin'  — user owns the workspace
- * 'viewer' — user is an invited member
+ * Returns the current user's role.
+ * 'admin'  — normal account owner
+ * 'viewer' — invited read-only member (has a workspace_members viewer row)
  * null     — still loading
  */
 export function useCurrentUserRole(): 'admin' | 'viewer' | null {
-  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
-  const { data: workspaces = [], isLoading } = useWorkspaces()
-  const [userId, setUserId] = useState<string | null>(null)
+  const { data } = useQuery({
+    queryKey: ['user-role'],
+    queryFn: async () => {
+      const scope = await getAccessScope()
+      if (!scope.userId) return null
+      return scope.isViewer ? ('viewer' as const) : ('admin' as const)
+    },
+    staleTime: 60_000,
+  })
 
-  useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => {
-      setUserId(data.user?.id ?? null)
-    })
-  }, [])
-
-  if (isLoading || !userId || !activeWorkspaceId) return null
-
-  // Check if user owns the active workspace
-  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
-  if (activeWorkspace && activeWorkspace.owner_id === userId) return 'admin'
-
-  // If user has any workspaces and owns at least one, they are admin globally
-  const ownsAny = workspaces.some((w) => w.owner_id === userId)
-  if (ownsAny) return 'admin'
-
-  // User is in the workspaces list but doesn't own any → viewer
-  if (workspaces.length > 0) return 'viewer'
-
-  return null
+  return data ?? null
 }
 
 /** Convenience hook — true when the user is a read-only viewer */
