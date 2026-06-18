@@ -1,35 +1,37 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Profile } from '@/types'
 
-export interface WorkspaceMember {
-  id: string
+export interface ProjectMember {
+  project_id: string
   user_id: string
-  email: string
-  role: 'admin' | 'viewer'
+  role: 'viewer'
   created_at: string
-  project_ids: string[]
+  email: string | null
   profiles: Pick<Profile, 'id' | 'name' | 'avatar_url'> | null
 }
 
-export function useWorkspaceMembers() {
+/** List all members of a project. */
+export function useProjectMembers(projectId: string) {
   return useQuery({
-    queryKey: ['workspace-members'],
+    queryKey: ['project-members', projectId],
     queryFn: async () => {
-      const res = await fetch('/api/team/invite')
+      const res = await fetch(`/api/team/members?projectId=${projectId}`)
       if (!res.ok) throw new Error(await res.text())
-      return res.json() as Promise<WorkspaceMember[]>
+      return res.json() as Promise<ProjectMember[]>
     },
+    enabled: !!projectId,
   })
 }
 
-export function useInviteMember() {
+/** Invite a user by email and add them to a project. */
+export function useInviteToProject() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (email: string) => {
-      const res = await fetch('/api/team/invite', {
+    mutationFn: async ({ email, projectId }: { email: string; projectId: string }) => {
+      const res = await fetch('/api/team/members', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, projectId }),
       })
       if (!res.ok) {
         const { error } = await res.json()
@@ -37,42 +39,29 @@ export function useInviteMember() {
       }
       return res.json()
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspace-members'] }),
+    onSuccess: (_data, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
+    },
   })
 }
 
-export function useRemoveMember() {
+/** Remove a viewer from a project. */
+export function useRemoveFromProject() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (memberId: string) => {
-      const res = await fetch('/api/team/invite', {
+    mutationFn: async ({ projectId, userId }: { projectId: string; userId: string }) => {
+      const res = await fetch('/api/team/members', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ memberId }),
+        body: JSON.stringify({ projectId, userId }),
       })
       if (!res.ok) {
         const { error } = await res.json()
         throw new Error(error ?? 'Failed to remove member')
       }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspace-members'] }),
-  })
-}
-
-export function useUpdateMemberAccess() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ userId, projectIds }: { userId: string; projectIds: string[] }) => {
-      const res = await fetch('/api/team/access', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, projectIds }),
-      })
-      if (!res.ok) {
-        const { error } = await res.json()
-        throw new Error(error ?? 'Failed to update access')
-      }
+    onSuccess: (_data, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspace-members'] }),
   })
 }

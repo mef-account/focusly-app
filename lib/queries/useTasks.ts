@@ -1,8 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, addDays } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
-import { getAccessScope } from '@/lib/queries/access'
-import { toError } from '@/lib/supabase/errors'
+import { toError, friendlyError } from '@/lib/supabase/errors'
 import { toast } from 'sonner'
 import type { Task } from '@/types'
 
@@ -15,6 +14,7 @@ export function useTasks(projectId?: string) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return []
 
+      // RLS returns only tasks this user is allowed to see
       let q = supabase
         .from('tasks')
         .select('*, project:projects(id,name,color,workspace_id,portfolio_id), workspace:workspaces(id,name,identifier), assignee:profiles!assignee_id(id,name,avatar_url), labels(id,name,color)')
@@ -23,32 +23,6 @@ export function useTasks(projectId?: string) {
 
       if (projectId) {
         q = q.eq('project_id', projectId)
-      } else {
-        const scope = await getAccessScope()
-        if (!scope.userId) return []
-
-        // Build OR filter across all accessible tasks:
-        // 1. Tasks in explicitly granted projects (viewer access)
-        // 2. Tasks in projects owned by the user
-        // 3. Tasks with no project but in an owned workspace (workspace-level tasks)
-        const orParts: string[] = []
-
-        if (scope.grantedProjectIds.length > 0) {
-          orParts.push(`project_id.in.(${scope.grantedProjectIds.join(',')})`)
-        }
-
-        if (scope.ownedWorkspaceIds.length > 0) {
-          const { data: projData } = await supabase
-            .from('projects').select('id').in('workspace_id', scope.ownedWorkspaceIds)
-          const ownedProjIds = (projData ?? []).map((p: { id: string }) => p.id)
-          if (ownedProjIds.length > 0)
-            orParts.push(`project_id.in.(${ownedProjIds.join(',')})`)
-          // Tasks with no project but directly in an owned workspace
-          orParts.push(`and(project_id.is.null,workspace_id.in.(${scope.ownedWorkspaceIds.join(',')}))`)
-        }
-
-        if (orParts.length === 0) return []
-        q = q.or(orParts.join(','))
       }
 
       const { data, error } = await q
@@ -63,25 +37,13 @@ export function useTasksDueToday() {
     queryKey: ['tasks', 'due-today'],
     queryFn: async () => {
       const today = format(new Date(), 'yyyy-MM-dd')
-      const scope = await getAccessScope()
-      if (!scope.userId) return []
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return []
 
-      const orParts: string[] = []
-      if (scope.grantedProjectIds.length > 0)
-        orParts.push(`project_id.in.(${scope.grantedProjectIds.join(',')})`)
-      if (scope.ownedWorkspaceIds.length > 0) {
-        const { data: projData } = await supabase
-          .from('projects').select('id').in('workspace_id', scope.ownedWorkspaceIds)
-        const ids = (projData ?? []).map((p: { id: string }) => p.id)
-        if (ids.length > 0) orParts.push(`project_id.in.(${ids.join(',')})`)
-        orParts.push(`and(project_id.is.null,workspace_id.in.(${scope.ownedWorkspaceIds.join(',')}))`)
-      }
-      if (orParts.length === 0) return []
-
+      // RLS returns only tasks this user can see
       const { data, error } = await supabase
         .from('tasks')
         .select('*, project:projects(id,name,color), assignee:profiles!assignee_id(id,name,avatar_url)')
-        .or(orParts.join(','))
         .lte('due_date', today)
         .not('status', 'in', '("done","cancelled")')
         .order('due_date', { ascending: true })
@@ -211,7 +173,7 @@ export function useUpdateTask() {
     },
     onError: (err, _vars, ctx) => {
       ctx?.previous?.forEach(([key, data]) => queryClient.setQueryData(key, data))
-      toast.error(err instanceof Error ? err.message : 'Could not update task.')
+      toast.error(friendlyError(err))
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
   })
@@ -238,7 +200,7 @@ export function useCreateTask() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : 'Could not create task.')
+      toast.error(friendlyError(err))
     },
   })
 }

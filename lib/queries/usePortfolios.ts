@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { getAccessScope, buildProjectFilter } from '@/lib/queries/access'
+import { friendlyError } from '@/lib/supabase/errors'
+import { toast } from 'sonner'
 import type { Portfolio } from '@/types'
 
 const supabase = createClient()
@@ -9,31 +10,12 @@ export function usePortfolios() {
   return useQuery({
     queryKey: ['portfolios'],
     queryFn: async () => {
-      const scope = await getAccessScope()
-      if (!scope.userId) return []
-
-      // Get accessible projects first, then derive portfolios from them
-      const filter = buildProjectFilter(scope)
-      if (!filter) return []
-
-      const { data: projects } = await supabase
-        .from('projects').select('portfolio_id').or(filter)
-      const portfolioIds = [...new Set(
-        (projects ?? [])
-          .map((p: { portfolio_id: string | null }) => p.portfolio_id)
-          .filter(Boolean) as string[]
-      )]
-      if (portfolioIds.length === 0) return []
-
-      // Also include all portfolios in owned workspaces (even empty ones)
-      const portfolioFilter: string[] = [`id.in.(${portfolioIds.join(',')})`]
-      if (scope.ownedWorkspaceIds.length > 0)
-        portfolioFilter.push(`workspace_id.in.(${scope.ownedWorkspaceIds.join(',')})`)
-
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return []
+      // RLS returns only portfolios this user is allowed to see
       const { data, error } = await supabase
         .from('portfolios')
         .select('*, owner:profiles!owner_id(id,name,avatar_url)')
-        .or(portfolioFilter.join(','))
         .order('created_at', { ascending: false })
       if (error) throw error
       return data as Portfolio[]
@@ -55,6 +37,7 @@ export function useCreatePortfolio() {
       return data as Portfolio
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['portfolios'] }),
+    onError: (err) => toast.error(friendlyError(err)),
   })
 }
 
@@ -66,6 +49,7 @@ export function useUpdatePortfolio() {
       if (error) throw error
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['portfolios'] }),
+    onError: (err) => toast.error(friendlyError(err)),
   })
 }
 

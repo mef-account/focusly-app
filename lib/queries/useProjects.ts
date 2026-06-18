@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { getAccessScope, buildProjectFilter } from '@/lib/queries/access'
+import { friendlyError } from '@/lib/supabase/errors'
+import { toast } from 'sonner'
 import type { Project } from '@/types'
 
 const supabase = createClient()
@@ -9,16 +10,12 @@ export function useProjects() {
   return useQuery({
     queryKey: ['projects'],
     queryFn: async () => {
-      const scope = await getAccessScope()
-      if (!scope.userId) return []
-
-      const filter = buildProjectFilter(scope)
-      if (!filter) return []
-
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return []
+      // RLS returns only the projects this user is allowed to see
       const { data, error } = await supabase
         .from('projects')
         .select('*, tasks(status, due_date)')
-        .or(filter)
         .order('created_at', { ascending: false })
       if (error) throw error
 
@@ -68,6 +65,7 @@ export function useCreateProject() {
       return data as Project
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
+    onError: (err) => toast.error(friendlyError(err)),
   })
 }
 
@@ -79,6 +77,7 @@ export function useUpdateProject() {
       if (error) throw error
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
+    onError: (err) => toast.error(friendlyError(err)),
   })
 }
 

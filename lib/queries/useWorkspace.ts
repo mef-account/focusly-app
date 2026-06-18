@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { getAccessScope } from '@/lib/queries/access'
 import type { Workspace } from '@/types'
 
 const supabase = createClient()
@@ -26,34 +25,12 @@ export function useWorkspaces() {
   return useQuery({
     queryKey: ['workspaces'],
     queryFn: async () => {
-      const scope = await getAccessScope()
-      if (!scope.userId) return []
-
-      const wsFilter: string[] = []
-
-      // Owned workspaces
-      if (scope.ownedWorkspaceIds.length > 0)
-        wsFilter.push(`id.in.(${scope.ownedWorkspaceIds.join(',')})`)
-
-      // Workspaces containing granted projects
-      if (scope.grantedProjectIds.length > 0) {
-        const { data: projects } = await supabase
-          .from('projects')
-          .select('workspace_id')
-          .in('id', scope.grantedProjectIds)
-        const grantedWsIds = [...new Set(
-          (projects ?? []).map((p: { workspace_id: string }) => p.workspace_id).filter(Boolean)
-        )]
-        if (grantedWsIds.length > 0)
-          wsFilter.push(`id.in.(${grantedWsIds.join(',')})`)
-      }
-
-      if (wsFilter.length === 0) return []
-
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return []
+      // RLS returns exactly the workspaces this user is allowed to see
       const { data, error } = await supabase
         .from('workspaces')
         .select('*')
-        .or(wsFilter.join(','))
         .order('created_at', { ascending: true })
       if (error) throw error
       return (data ?? []) as Workspace[]
