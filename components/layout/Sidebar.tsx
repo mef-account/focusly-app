@@ -24,7 +24,7 @@ import { useSidebarStore } from '@/store/useSidebarStore'
 import { useQuickCreateStore } from '@/store/useQuickCreateStore'
 import { useWorkspaceStore } from '@/store/useWorkspaceStore'
 import { useWorkspaces } from '@/lib/queries/useWorkspace'
-import { useIsViewer } from '@/lib/hooks/useCurrentUserRole'
+import { useCurrentUserRole } from '@/lib/hooks/useCurrentUserRole'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
@@ -50,7 +50,11 @@ export function Sidebar() {
   const openQuickCreate = useQuickCreateStore((s) => s.open)
   const { activeWorkspaceId, setActiveWorkspace } = useWorkspaceStore()
   const { data: workspaces = [] } = useWorkspaces()
-  const isViewer = useIsViewer()
+  const role = useCurrentUserRole()
+  const isAdmin = role === 'admin'
+  const navItems = isAdmin
+    ? NAV_ITEMS
+    : NAV_ITEMS.filter((item) => item.href === '/app/projects')
 
   // Auto-select first workspace if none stored yet
   useEffect(() => {
@@ -79,7 +83,7 @@ export function Sidebar() {
           <Zap className="h-5 w-5 shrink-0 text-brand-600" />
           {!collapsed && <span className="text-sm tracking-tight">Focusly</span>}
         </div>
-        {!isViewer && (
+        {isAdmin && (
           <Tooltip>
             <TooltipTrigger render={<span />}>
               <button
@@ -102,7 +106,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
-        {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
+        {navItems.map(({ label, href, icon: Icon }) => {
           const active = pathname.startsWith(href)
 
           const item = (

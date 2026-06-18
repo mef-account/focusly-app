@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
@@ -23,6 +22,7 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command'
+import { useCurrentUserRole } from '@/lib/hooks/useCurrentUserRole'
 
 const PAGES = [
   { label: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
@@ -36,6 +36,12 @@ const PAGES = [
   { label: 'Settings', href: '/app/settings', icon: Settings },
 ]
 
+const QUICK_ACTIONS = [
+  { label: 'New project', href: '/app/projects', icon: Plus },
+  { label: 'New task', href: '/app/my-tasks', icon: Plus },
+  { label: 'Open daily note', href: '/app/notes', icon: Plus },
+]
+
 interface CommandPaletteProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -43,6 +49,11 @@ interface CommandPaletteProps {
 
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const router = useRouter()
+  const role = useCurrentUserRole()
+  const isAdmin = role === 'admin'
+  const pages = isAdmin
+    ? PAGES
+    : PAGES.filter((page) => page.href === '/app/projects' || page.href === '/app/settings')
 
   const run = (href: string) => {
     router.push(href)
@@ -56,7 +67,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         <CommandEmpty>No results found.</CommandEmpty>
 
         <CommandGroup heading="Navigation">
-          {PAGES.map(({ label, href, icon: Icon }) => (
+          {pages.map(({ label, href, icon: Icon }) => (
             <CommandItem key={href} onSelect={() => run(href)}>
               <Icon className="mr-2 h-4 w-4" />
               {label}
@@ -64,22 +75,19 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           ))}
         </CommandGroup>
 
-        <CommandSeparator />
-
-        <CommandGroup heading="Quick actions">
-          <CommandItem onSelect={() => run('/app/projects')}>
-            <Plus className="mr-2 h-4 w-4" />
-            New project
-          </CommandItem>
-          <CommandItem onSelect={() => run('/app/my-tasks')}>
-            <Plus className="mr-2 h-4 w-4" />
-            New task
-          </CommandItem>
-          <CommandItem onSelect={() => run('/app/notes')}>
-            <Plus className="mr-2 h-4 w-4" />
-            Open daily note
-          </CommandItem>
-        </CommandGroup>
+        {isAdmin && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Quick actions">
+              {QUICK_ACTIONS.map(({ label, href, icon: Icon }) => (
+                <CommandItem key={label} onSelect={() => run(href)}>
+                  <Icon className="mr-2 h-4 w-4" />
+                  {label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
       </CommandList>
     </CommandDialog>
   )
