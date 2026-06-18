@@ -125,7 +125,7 @@ function TeamTab() {
         {projects.length === 0 ? (
           <p className="text-sm text-muted-foreground">No projects yet. Create a project first.</p>
         ) : (
-          <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+          <Select value={selectedProjectId} onValueChange={(val) => setSelectedProjectId(val ?? '')}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select a project…" />
             </SelectTrigger>
