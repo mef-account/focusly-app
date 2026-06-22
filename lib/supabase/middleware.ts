@@ -35,5 +35,35 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // Viewer users are restricted to Structure (/app/projects) only.
+  if (user) {
+    const restrictedForViewer = [
+      '/app/dashboard',
+      '/app/planner',
+      '/app/notes',
+      '/app/views',
+      '/app/tracker',
+    ]
+
+    const pathname = request.nextUrl.pathname
+    const isRestricted = restrictedForViewer.some(
+      (p) => pathname === p || pathname.startsWith(`${p}/`)
+    )
+
+    if (isRestricted) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('type')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      if (profile?.type === 'user') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/app/projects'
+        return NextResponse.redirect(url)
+      }
+    }
+  }
+
   return supabaseResponse
 }
