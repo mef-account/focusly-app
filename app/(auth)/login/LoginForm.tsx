@@ -32,7 +32,7 @@ export function LoginForm() {
         setError(error.message)
         setLoading(false)
       } else {
-        router.replace('/app')
+        router.replace('/')
       }
     })
   }, [router])
@@ -76,7 +76,7 @@ export function LoginForm() {
       return
     }
 
-    router.push('/app')
+    router.push('/')
     router.refresh()
   }
 
