@@ -1,11 +1,32 @@
+import { redirect } from 'next/navigation'
 import { TimerWidget } from '@/components/dashboard/TimerWidget'
 import { DailyProgressWidget } from '@/components/dashboard/DailyProgressWidget'
 import { TodaysTasksWidget } from '@/components/dashboard/TodaysTasksWidget'
 import { UpcomingWidget } from '@/components/dashboard/UpcomingWidget'
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
 import { DailyNoteWidget } from '@/components/dashboard/DailyNoteWidget'
+import { createClient } from '@/lib/supabase/server'
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('type')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (profile?.type === 'user') {
+    redirect('/app/projects')
+  }
+
   return (
     <div className="-m-6 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden px-[100px]">
       {/* Header */}
