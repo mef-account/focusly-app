@@ -35,11 +35,15 @@ export function useTodayDailyNote() {
   return useQuery({
     queryKey: ['notes', 'daily', today],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return null
+
       const { data, error } = await supabase
         .from('notes')
         .select('*')
         .eq('note_type', 'daily')
         .eq('note_date', today)
+        .eq('user_id', user.id)
         .maybeSingle()
       if (error) throw toError(error)
       return data as Note | null
@@ -60,6 +64,7 @@ export function useEnsureTodayDailyNote() {
         .select('*')
         .eq('note_type', 'daily')
         .eq('note_date', today)
+        .eq('user_id', user.id)
         .maybeSingle()
 
       if (fetchError) throw toError(fetchError)
