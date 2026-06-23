@@ -141,7 +141,7 @@ export function DescriptionRichTextEditor({
         {readOnlyHtml ? (
           <div
             className={cn(
-              'prose prose-sm dark:prose-invert max-w-none text-foreground/90 [&_a]:text-primary [&_a]:underline',
+              'prose prose-sm dark:prose-invert max-w-none text-foreground/90 [&_a]:cursor-pointer [&_a]:text-primary [&_a]:underline',
               minHeightClassName
             )}
             dangerouslySetInnerHTML={{ __html: readOnlyHtml }}
@@ -206,7 +206,7 @@ export function DescriptionRichTextEditor({
           contentEditable
           suppressContentEditableWarning
           className={cn(
-            'prose prose-sm dark:prose-invert max-w-none w-full px-3 py-2.5 text-sm outline-none [&_a]:text-primary [&_a]:underline',
+            'prose prose-sm dark:prose-invert max-w-none w-full px-3 py-2.5 text-sm outline-none [&_a]:cursor-pointer [&_a]:text-primary [&_a]:underline',
             minHeightClassName
           )}
           onInput={syncFromEditor}
