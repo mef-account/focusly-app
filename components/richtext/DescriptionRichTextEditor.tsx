@@ -37,6 +37,39 @@ function ToolbarButton({
   )
 }
 
+const SAFE_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
+
+function getSafeUrl(rawUrl: string): string | null {
+  try {
+    const parsed = new URL(rawUrl, window.location.origin)
+    if (!SAFE_PROTOCOLS.has(parsed.protocol)) return null
+    return parsed.toString()
+  } catch {
+    return null
+  }
+}
+
+function normalizeAnchorAttributes(html: string): string {
+  if (!html || typeof window === 'undefined') return html
+  const container = document.createElement('div')
+  container.innerHTML = html
+  const links = container.querySelectorAll('a[href]')
+  links.forEach((link) => {
+    const href = link.getAttribute('href')?.trim() ?? ''
+    const safeHref = getSafeUrl(href)
+    if (!safeHref) {
+      link.removeAttribute('href')
+      link.removeAttribute('target')
+      link.removeAttribute('rel')
+      return
+    }
+    link.setAttribute('href', safeHref)
+    link.setAttribute('target', '_blank')
+    link.setAttribute('rel', 'noopener noreferrer')
+  })
+  return container.innerHTML
+}
+
 export function DescriptionRichTextEditor({
   value,
   onChange,
@@ -72,8 +105,12 @@ export function DescriptionRichTextEditor({
   function syncFromEditor() {
     const editor = editorRef.current
     if (!editor) return
-    setIsEmpty(stripHtmlToText(editor.innerHTML).trim().length === 0)
-    onChange(editor.innerHTML)
+    const normalizedHtml = normalizeAnchorAttributes(editor.innerHTML)
+    if (editor.innerHTML !== normalizedHtml) {
+      editor.innerHTML = normalizedHtml
+    }
+    setIsEmpty(stripHtmlToText(normalizedHtml).trim().length === 0)
+    onChange(normalizedHtml)
   }
 
   function runCommand(command: string, commandValue?: string) {
@@ -93,7 +130,9 @@ export function DescriptionRichTextEditor({
     if (readOnly) return
     const url = window.prompt('Enter link URL')
     if (!url) return
-    runCommand('createLink', url)
+    const safeUrl = getSafeUrl(url)
+    if (!safeUrl) return
+    runCommand('createLink', safeUrl)
   }
 
   if (readOnly) {
@@ -171,6 +210,17 @@ export function DescriptionRichTextEditor({
             minHeightClassName
           )}
           onInput={syncFromEditor}
+          onClick={(e) => {
+            const target = e.target as HTMLElement | null
+            const anchor = target?.closest('a') as HTMLAnchorElement | null
+            if (!anchor) return
+            const href = anchor.getAttribute('href')?.trim() ?? ''
+            const safeUrl = getSafeUrl(href)
+            if (!safeUrl) return
+            e.preventDefault()
+            e.stopPropagation()
+            window.open(safeUrl, '_blank', 'noopener,noreferrer')
+          }}
           onKeyDown={(e) => {
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
               e.preventDefault()
