@@ -5,26 +5,34 @@ import Link from 'next/link'
 import { ExternalLink } from 'lucide-react'
 import { marked } from 'marked'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useEnsureTodayDailyNote } from '@/lib/queries/useNotes'
+import { useEnsureTodayDailyNote, useTodayDailyNote } from '@/lib/queries/useNotes'
 
 export function DailyNoteWidget() {
   const ensureToday = useEnsureTodayDailyNote()
+  const { data: todayNote, isLoading: loadingToday } = useTodayDailyNote()
 
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [html, setHtml] = useState('')
-  const initializedRef = useRef(false)
+  const ensureAttemptedRef = useRef(false)
 
   useEffect(() => {
-    if (initializedRef.current) return
-    initializedRef.current = true
+    if (todayNote) {
+      setTitle(todayNote.title)
+      setContent(todayNote.content)
+    }
+  }, [todayNote])
+
+  useEffect(() => {
+    if (loadingToday || todayNote || ensureAttemptedRef.current) return
+    ensureAttemptedRef.current = true
     ensureToday.mutate(undefined, {
       onSuccess: (note) => {
         setTitle(note.title)
         setContent(note.content)
       },
     })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadingToday, todayNote]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!content) { setHtml(''); return }
@@ -33,7 +41,7 @@ export function DailyNoteWidget() {
     else result.then(setHtml)
   }, [content])
 
-  const isLoading = ensureToday.isPending && !content
+  const isLoading = (loadingToday || ensureToday.isPending) && !content
 
   return (
     <div className="flex h-full flex-col rounded-xl border bg-card overflow-hidden">

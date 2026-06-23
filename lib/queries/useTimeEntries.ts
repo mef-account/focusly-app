@@ -19,6 +19,9 @@ export function useTimeEntriesToday() {
       if (error) throw toError(error)
       return data as TimeEntry[]
     },
+    staleTime: 30_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
   })
 }
 

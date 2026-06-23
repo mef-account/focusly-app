@@ -35,16 +35,24 @@ export function NotesPageClient() {
   const [saving, setSaving] = useState(false)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const ensuredTodayRef = useRef(false)
   const todayStr = format(new Date(), 'yyyy-MM-dd')
 
   const activeNote = notes?.find((n) => n.id === activeId) ?? null
 
-  // Ensure today's daily note exists on mount
+  // Ensure today's daily note exists only if missing from loaded list
   useEffect(() => {
+    if (!notes || ensuredTodayRef.current) return
+    const todayNote = notes.find((n) => n.note_date === todayStr)
+    if (todayNote) {
+      setActiveId((prev) => prev ?? todayNote.id)
+      return
+    }
+    ensuredTodayRef.current = true
     ensureToday.mutate(undefined, {
       onSuccess: (note) => setActiveId((prev) => prev ?? note.id),
     })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [notes, todayStr, ensureToday])
 
   // Load note into local state when selection changes
   useEffect(() => {

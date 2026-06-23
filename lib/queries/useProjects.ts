@@ -32,6 +32,9 @@ export function useProjects() {
         } as Project
       })
     },
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
   })
 }
 

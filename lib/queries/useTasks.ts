@@ -29,6 +29,9 @@ export function useTasks(projectId?: string) {
       if (error) throw toError(error)
       return data as Task[]
     },
+    staleTime: 30_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -50,6 +53,9 @@ export function useTasksDueToday() {
       if (error) throw error
       return data as Task[]
     },
+    staleTime: 30_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -107,6 +113,9 @@ export function useTasksDueTomorrow() {
       if (error) throw error
       return data as Task[]
     },
+    staleTime: 30_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
   })
 }
 

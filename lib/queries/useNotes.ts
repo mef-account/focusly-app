@@ -27,6 +27,9 @@ export function useDailyNotes() {
       if (error) throw toError(error)
       return data as Note[]
     },
+    staleTime: 30_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -48,6 +51,9 @@ export function useTodayDailyNote() {
       if (error) throw toError(error)
       return data as Note | null
     },
+    staleTime: 30_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -89,6 +95,7 @@ export function useEnsureTodayDailyNote() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notes', 'daily'] })
+      queryClient.invalidateQueries({ queryKey: ['notes', 'daily', todayStr()] })
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Could not create daily note.')
