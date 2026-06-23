@@ -6,10 +6,11 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
+import { DescriptionRichTextEditor } from '@/components/richtext/DescriptionRichTextEditor'
 import { useUpdateProject } from '@/lib/queries/useProjects'
 import { usePortfolios } from '@/lib/queries/usePortfolios'
+import { normalizeDescriptionForSave } from '@/lib/richtext'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -51,7 +52,7 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
     await updateProject.mutateAsync({
       id: project.id,
       name: name.trim(),
-      description: description.trim() || null,
+      description: normalizeDescriptionForSave(description),
       color,
       portfolio_id: portfolioId === 'none' ? null : portfolioId,
     })
@@ -122,12 +123,12 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="edit-proj-desc">Description</Label>
-            <Textarea
-              id="edit-proj-desc"
-              rows={3}
+            <Label>Description</Label>
+            <DescriptionRichTextEditor
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={setDescription}
+              placeholder="Optional description"
+              minHeightClassName="min-h-[96px]"
             />
           </div>
 

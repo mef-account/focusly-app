@@ -6,13 +6,14 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { useUpdatePortfolio } from '@/lib/queries/usePortfolios'
 import { useWorkspaces } from '@/lib/queries/useWorkspace'
+import { DescriptionRichTextEditor } from '@/components/richtext/DescriptionRichTextEditor'
+import { normalizeDescriptionForSave } from '@/lib/richtext'
 import type { Portfolio } from '@/types'
 
 const COLORS = [
@@ -51,7 +52,7 @@ export function EditPortfolioDialog({ portfolio, open, onOpenChange }: EditPortf
     await updatePortfolio.mutateAsync({
       id: portfolio.id,
       name: name.trim(),
-      description: description.trim() || null,
+      description: normalizeDescriptionForSave(description),
       color,
       workspace_id: workspaceId ?? undefined,
     })
@@ -112,12 +113,12 @@ export function EditPortfolioDialog({ portfolio, open, onOpenChange }: EditPortf
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="edit-port-desc">Description</Label>
-            <Textarea
-              id="edit-port-desc"
-              rows={3}
+            <Label>Description</Label>
+            <DescriptionRichTextEditor
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={setDescription}
+              placeholder="Optional description"
+              minHeightClassName="min-h-[96px]"
             />
           </div>
 

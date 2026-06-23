@@ -10,7 +10,6 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -21,6 +20,8 @@ import {
 } from '@/components/ui/select'
 import { useCreatePortfolio } from '@/lib/queries/usePortfolios'
 import { useWorkspaces } from '@/lib/queries/useWorkspace'
+import { DescriptionRichTextEditor } from '@/components/richtext/DescriptionRichTextEditor'
+import { normalizeDescriptionForSave } from '@/lib/richtext'
 
 const COLORS = [
   '#534AB7', '#7C3AED', '#2563EB', '#0891B2',
@@ -51,7 +52,7 @@ export function CreatePortfolioDialog({ open, onOpenChange }: CreatePortfolioDia
 
     await createPortfolio.mutateAsync({
       name: name.trim(),
-      description: description.trim() || null,
+      description: normalizeDescriptionForSave(description),
       color,
       workspace_id: effectiveWorkspaceId,
     })
@@ -123,13 +124,12 @@ export function CreatePortfolioDialog({ open, onOpenChange }: CreatePortfolioDia
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="portfolio-desc">Description</Label>
-            <Textarea
-              id="portfolio-desc"
-              placeholder="Optional description"
-              rows={3}
+            <Label>Description</Label>
+            <DescriptionRichTextEditor
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={setDescription}
+              placeholder="Optional description"
+              minHeightClassName="min-h-[96px]"
             />
           </div>
 

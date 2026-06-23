@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -12,10 +11,11 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { useCreateProject } from '@/lib/queries/useProjects'
 import { useWorkspaces } from '@/lib/queries/useWorkspace'
 import { usePortfolios } from '@/lib/queries/usePortfolios'
+import { DescriptionRichTextEditor } from '@/components/richtext/DescriptionRichTextEditor'
+import { normalizeDescriptionForSave } from '@/lib/richtext'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -70,7 +70,7 @@ export function CreateProjectDialog({ open, onOpenChange, defaultPortfolioId }: 
 
     await createProject.mutateAsync({
       name: name.trim(),
-      description: description.trim() || null,
+      description: normalizeDescriptionForSave(description),
       color,
       workspace_id: effectiveWorkspaceId,
       portfolio_id: portfolioId === 'none' ? null : portfolioId,
@@ -170,13 +170,12 @@ export function CreateProjectDialog({ open, onOpenChange, defaultPortfolioId }: 
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="proj-desc">Description</Label>
-            <Textarea
-              id="proj-desc"
-              placeholder="Optional description"
-              rows={3}
+            <Label>Description</Label>
+            <DescriptionRichTextEditor
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={setDescription}
+              placeholder="Optional description"
+              minHeightClassName="min-h-[96px]"
             />
           </div>
 

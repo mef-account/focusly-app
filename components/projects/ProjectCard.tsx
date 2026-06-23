@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatDate } from '@/lib/utils'
+import { stripHtmlToText } from '@/lib/richtext'
 import { EditProjectDialog } from '@/components/projects/EditProjectDialog'
 import { DeleteProjectDialog } from '@/components/projects/DeleteProjectDialog'
 import type { Project } from '@/types'
@@ -22,6 +23,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
   const done = project.done_count ?? 0
   const total = project.task_count ?? 0
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
+  const descriptionText = stripHtmlToText(project.description ?? '').trim()
 
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -70,8 +72,8 @@ export function ProjectCard({ project }: ProjectCardProps) {
           </div>
         </div>
 
-        {project.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
+        {descriptionText && (
+          <p className="text-sm text-muted-foreground line-clamp-2">{descriptionText}</p>
         )}
 
         <div className="space-y-1">

@@ -4,11 +4,11 @@ import { use, useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Plus, FileText, Maximize2, SquarePen } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { BoardView } from '@/components/projects/BoardView'
 import { ListView } from '@/components/projects/ListView'
 import { TaskSheet } from '@/components/tasks/TaskSheet'
+import { DescriptionRichTextEditor } from '@/components/richtext/DescriptionRichTextEditor'
 import { useProject, useUpdateProject } from '@/lib/queries/useProjects'
 import { useTasks } from '@/lib/queries/useTasks'
 import { useTimeTotalsByTask } from '@/lib/queries/useTimeEntries'
@@ -17,6 +17,7 @@ import { useNotePanelStore } from '@/store/useNotePanelStore'
 import { useQuickCreateStore } from '@/store/useQuickCreateStore'
 import { useIsViewer } from '@/lib/hooks/useCurrentUserRole'
 import { formatDate } from '@/lib/utils'
+import { normalizeDescriptionForSave } from '@/lib/richtext'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -98,17 +99,19 @@ export default function ProjectDetailPage({ params }: PageProps) {
         </div>
 
         {/* Editable description */}
-        <Textarea
-          placeholder="Add a description…"
-          className="min-h-[60px] w-full resize-none border-0 p-0 shadow-none focus-visible:ring-0 text-sm text-foreground/80 placeholder:text-muted-foreground/50 bg-transparent"
+        <DescriptionRichTextEditor
           value={description}
           readOnly={isViewer}
-          onChange={(e) => !isViewer && setDescription(e.target.value)}
-          onBlur={() => {
+          placeholder="Add a description..."
+          className="border-0 shadow-none"
+          minHeightClassName="min-h-[72px]"
+          onChange={(value) => !isViewer && setDescription(value)}
+          onCommit={() => {
             if (isViewer) return
-            const trimmed = description.trim() || null
-            if (trimmed !== (project.description ?? null)) {
-              updateProject.mutate({ id, description: trimmed })
+            const nextValue = normalizeDescriptionForSave(description)
+            const currentValue = normalizeDescriptionForSave(project.description ?? '')
+            if (nextValue !== currentValue) {
+              updateProject.mutate({ id, description: nextValue })
             }
           }}
         />

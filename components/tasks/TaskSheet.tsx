@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Sheet, SheetContent, SheetHeader } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,7 +50,9 @@ import { usePortfolios } from '@/lib/queries/usePortfolios'
 import { useIsViewer } from '@/lib/hooks/useCurrentUserRole'
 import { TaskTimerButton } from '@/components/tracker/TaskTimerButton'
 import { AssigneePicker } from '@/components/tasks/AssigneePicker'
+import { DescriptionRichTextEditor } from '@/components/richtext/DescriptionRichTextEditor'
 import { createClient } from '@/lib/supabase/client'
+import { normalizeDescriptionForSave } from '@/lib/richtext'
 import {
   STATUS_LABELS,
   PRIORITY_LABELS,
@@ -531,13 +532,17 @@ export function TaskSheet() {
 
               {/* Description */}
               <div className="border-b pb-5">
-                <Textarea
-                  placeholder="Add a description…"
-                  className="min-h-[80px] w-full resize-none border-0 p-0 shadow-none focus-visible:ring-0 text-sm text-foreground/80 placeholder:text-muted-foreground/50 bg-transparent"
+                <DescriptionRichTextEditor
                   value={task.description ?? ''}
                   readOnly={isViewer}
-                  onChange={(e) => !isViewer && setTask({ ...task, description: e.target.value })}
-                  onBlur={() => { if (!isViewer) patch({ description: task.description }) }}
+                  placeholder="Add a description..."
+                  className="border-0 shadow-none"
+                  minHeightClassName="min-h-[92px]"
+                  onChange={(value) => !isViewer && setTask({ ...task, description: value })}
+                  onCommit={() => {
+                    if (isViewer) return
+                    patch({ description: normalizeDescriptionForSave(task.description ?? '') })
+                  }}
                 />
               </div>
 
