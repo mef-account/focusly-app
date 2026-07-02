@@ -1,5 +1,18 @@
 export function isLikelyHtml(value: string): boolean {
-  return /<\/?[a-z][\s\S]*>/i.test(value)
+  return /<\/?[a-z][\s\S]*>/i.test(value) || /&(nbsp|amp|lt|gt|quot|#39|#\d+|#x[0-9a-f]+);/i.test(value)
+}
+
+// Collapses one level of accidental double-escaping of entities we care about
+// (e.g. "&amp;nbsp;" -> "&nbsp;"), so legacy corrupted values self-heal on read.
+function repairDoubleEscapedEntities(value: string): string {
+  const pattern = /&amp;(nbsp|amp|lt|gt|quot|#39|#\d+|#x[0-9a-f]+);/gi
+  let result = value
+  for (let i = 0; i < 5; i++) {
+    const next = result.replace(pattern, '&$1;')
+    if (next === result) break
+    result = next
+  }
+  return result
 }
 
 function decodeBasicEntities(value: string): string {
@@ -23,8 +36,9 @@ export function escapeHtml(value: string): string {
 
 export function toEditorHtml(value: string): string {
   if (!value) return ''
-  if (isLikelyHtml(value)) return value
-  return escapeHtml(value).replaceAll('\n', '<br>')
+  const repaired = repairDoubleEscapedEntities(value)
+  if (isLikelyHtml(repaired)) return repaired
+  return escapeHtml(repaired).replaceAll('\n', '<br>')
 }
 
 export function stripHtmlToText(value: string): string {
